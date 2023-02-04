@@ -112,8 +112,6 @@ class Block:
         self.parent_block_id = parent_block_id
         self.block_position = block_position
 
-        self.child_blocks = []
-
     def verify_block(self, utxo_set:Dict[hashlib._hashlib.HASH, Utxo]):
         """Verify if block can be added to the blockchain
 
@@ -149,6 +147,7 @@ class Blockchain:
             genesis_block (Block): Genesis block of the blockchain
         """
         self.root = genesis_block
+        self.current_block = genesis_block
         self.blocks = dict()    # Dict[hashlib._hashlib.HASH, Block]
         self.blocks[genesis_block.id] = genesis_block
 
@@ -169,5 +168,7 @@ class Blockchain:
         if parent_block_id not in list(self.blocks.keys()): # Parent block does not exist
             return False
         
-        self.blocks[parent_block_id].add_child_block(child_block)
+        self.blocks[child_block.id] = child_block
+        child_block.parent_block_id = parent_block_id
+        self.current_block = child_block
         return True

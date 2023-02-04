@@ -11,7 +11,7 @@ from modules.blockchain import Block, Transaction, Utxo
 class Simulator:
     """Simulator instance
     """
-    def __init__(self, num_nodes:int , slow_nodes:float, inter_arrival_time:float):
+    def __init__(self, num_nodes:int , slow_nodes:float, inter_arrival_time:float, simulation_time:float):
         self.num_nodes = num_nodes
         self.num_slow_nodes = int(num_nodes*slow_nodes)
         self.iat = inter_arrival_time
@@ -20,17 +20,20 @@ class Simulator:
         self.nodes = self.create_nodes()    # Dictionary [id: Node]
         self.create_network()
         
-        self.event_handler = EventHandler()
+        self.event_queue = list()
+        self.event_handler = EventHandler(self.event_queue, self.nodes, self.iat)
         self.gen_exp = np.random.default_rng()  # Exponential distribution generator
 
         # Initialize events
         for node in self.nodes.values():
             new_event = Event(
-                event_time = self.gen_exp.exponential(self.iat),
-                event_type = 1, 
+                event_time = float("{:.2f}".format(self.gen_exp.exponential(self.iat))),
+                event_type = 1, # Create transaction
                 event_node = node
             )
             self.event_handler.add_event(new_event)
+
+        self.run_simulation(simulation_time=simulation_time)
 
     # ==========================================================================================
     # Peer network
@@ -88,8 +91,9 @@ class Simulator:
                     if len(node.peers) == node.num_peers:
                         break
                     if node != rand_peer and (rand_peer.id not in node.peers) and len(node.peers)<node.num_peers and len(rand_peer.peers)<rand_peer.num_peers:
-                        node.add_peer(rand_peer.id)
-                        rand_peer.add_peer(node.id)
+                        propagation_delay = round(random.uniform(0.01, 0.5), 4)
+                        node.add_peer(rand_peer.id, propagation_delay)
+                        rand_peer.add_peer(node.id, propagation_delay)
             
             if self.check_connectivity():
                 break
@@ -127,7 +131,11 @@ class Simulator:
 
     # ==========================================================================================
     # Simulator functions
-
-        
+    def run_simulation(self, simulation_time:float):
+        current_time = 0
+        while current_time < simulation_time and self.event_queue != []:
+            event = heapq.heappop(self.event_queue)
+            current_time = event.time
+            self.event_handler.handle_event(event) 
 
         
