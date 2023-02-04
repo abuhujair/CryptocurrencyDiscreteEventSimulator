@@ -1,4 +1,6 @@
-from modules.node import Node
+import heapq
+
+from modules.network import Node
 
 
 class Event:
@@ -17,3 +19,17 @@ class Event:
     def __lt__(self,other:"Event")->bool:
         return self.time < other.time
     
+
+class EventHandler:
+    """Event handler instance of the simulator
+    """
+    def __init__(self) -> None:
+        self.event_queue = []   # Priority list for events
+    
+    def add_event(self, event:Event):
+        """Push new event in the event queue
+
+        Args:
+            event (Event): Event object
+        """
+        heapq.heappush(self.event_queue, event)

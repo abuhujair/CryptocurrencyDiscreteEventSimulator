@@ -1,9 +1,12 @@
 import random
 import numpy as np
 import heapq
+from typing import List
 
-from modules.node import Node
-from modules.event import Event
+from modules.network import Node
+from modules.event_handler import Event, EventHandler
+from modules.blockchain import Block, Transaction, Utxo
+
 
 class Simulator:
     """Simulator instance
@@ -13,28 +16,67 @@ class Simulator:
         self.num_slow_nodes = int(num_nodes*slow_nodes)
         self.iat = inter_arrival_time
         
+        # Create peer network
         self.nodes = self.create_nodes()    # Dictionary [id: Node]
         self.create_network()
         
-        self.event_queue = []   # priority queue of Event objects
-        self.gen_exp = np.random.default_rng()
+        self.event_handler = EventHandler()
+        self.gen_exp = np.random.default_rng()  # Exponential distribution generator
 
-        self.initialize_simulator()
+        # Initialize events
+        for node in self.nodes.values():
+            new_event = Event(
+                event_time = self.gen_exp.exponential(self.iat),
+                event_type = 1, 
+                event_node = node
+            )
+            self.event_handler.add_event(new_event)
 
+    # ==========================================================================================
+    # Peer network
     def create_nodes(self):
         """Create all nodes in the blockchain
 
         Returns:
             dict: Dictionary [id: Node] of all the newly generated nodes
         """
+        utxo_set = dict()
+        transactions = list()
+
+        # Generate genesis block transactions
+        for i in range(self.num_nodes):
+            coins = random.uniform(50, 500)
+            new_transaction = Transaction(
+                payer=-1,
+                payee=i,
+                value=coins,
+                timestamp=0,
+            )
+            transactions.append(new_transaction)
+            
+            new_utxo = Utxo(
+                new_transaction.id,
+                owner=i,
+                value=coins
+            )
+
+            utxo_set[new_utxo.id] = new_utxo
+
+        genesis_block = Block(
+            parent_block_id=None,
+            block_position=0,
+            timestamp=0,
+            transactions=transactions
+        )
+
         nodes = {}
         random_index = random.sample(range(self.num_nodes),self.num_nodes)
 
         for i in random_index[0:self.num_slow_nodes]:   # SLOW nodes
-            nodes[i] = Node(node_id = i,node_type = 0)
+            nodes[i] = Node(node_id=i, node_type=0, genesis_block=genesis_block, utxo_set=utxo_set)
         
         for i in random_index[self.num_slow_nodes:self.num_nodes]:  # FAST nodes
-            nodes[i] = Node(node_id = i,node_type = 1)
+            nodes[i] = Node(node_id=i, node_type=1, genesis_block=genesis_block, utxo_set=utxo_set)
         return nodes
 
     def create_network(self):
@@ -83,19 +125,9 @@ class Simulator:
         print("The Network is not connected.")
         return False
 
-    def initialize_simulator(self):
-        """Initial event creation to first transaction event for all nodes.
-        """
-        
-        #TODO
-        # Provide initial utxo
+    # ==========================================================================================
+    # Simulator functions
 
-        for node in self.nodes.values():
-            heapq.heappush(
-                self.event_queue,
-                Event(
-                    event_time = self.gen_exp.exponential(self.iat),
-                    event_type = 1, 
-                    event_node = node
-                )
-            )
+        
+
+        
