@@ -1,0 +1,7 @@
+# virtual environment
+venv 
+
+# temporary files
+archives
+
+**__pycache__
