@@ -9,7 +9,7 @@ from modules.blockchain import Blockchain, Block, Utxo, Transaction
 class Node:
     """Node object for the blockchain
     """
-    def __init__(self, node_id: int, node_type: int, genesis_block:Block, utxo_set:Dict[hashlib._hashlib.HASH, Utxo]):
+    def __init__(self, node_id: int, node_type: int, genesis_block:Block, utxo_set:Dict[hashlib._hashlib.HASH, Utxo], hash):
         """Node object
 
         Args:
@@ -31,6 +31,8 @@ class Node:
                 self.own_utxo.append(utxo)
 
         self.propagation_delays = {}
+        self.hash = hash
+
         self.transactions = dict()  # [transaction_id, Transaction]
         self.gen_exp = np.random.default_rng()
 
@@ -138,3 +140,127 @@ class Node:
     # Miner functions
     def add_utxo(self):
         raise NotImplementedError
+    
+    def mine_block(self, block:Block):
+        """Operations performed after mining has completed
+
+        Args:
+            block (Block): New block to be added to the blockchain
+        """
+        self.blockchain.add_block(
+            parent_block_id=self.blockchain.current_block.id,
+            child_block=block,
+        )
+        for txn in block.transactions:
+            del self.transactions[txn.id]
+            self.execute_transaction(txn)
+
+        self.utxo_set[block.miner_utxo.id] = block.miner_utxo   # Coin base transaction        
+
+    def create_block(self):
+        """Create block for mining
+
+        Returns:
+            Block: Newly formed block
+        """
+        counter = 0
+        transactions = []
+        for txn_id in list(transactions.keys()):
+            if self.verify_transaction(self.transactions[txn_id]):
+                transactions.append(self.transactions[txn_id])
+            else:
+                del self.transactions[txn_id]
+            counter += 1
+            if counter == 999:
+                break
+        
+        block = Block(
+            parent_block_id = -1,
+            block_position = self.blockchain.current_block.block_position + 1,
+            timestamp = -1,
+            transactions = transactions,
+            block_creator = self.id
+        )
+        return block 
+
+    def verify_transaction(self, transaction:Transaction):
+        """Verify total incoming and outgoing utxo of the transaction
+
+        Args:
+            transaction (Transaction): Transaction object
+
+        Returns:
+            bool: True for success, False for failure
+        """
+        total_incoming = 0
+        total_outgoing = 0
+
+        # Check if all the utxo are valid by comparing them from the miner utxo set
+        for utxo in transaction.input_utxos:
+            if not utxo.id in list(self.utxo_set.keys()):
+                return False
+            
+        for utxo in transaction.input_utxos:
+            total_incoming += utxo.value
+
+        for utxo in transaction.output_utxos:
+            total_outgoing += utxo.value
+
+        if total_incoming != total_outgoing + transaction.value or total_incoming < 0:  # Total incoming = Total outgoing
+            return False
+        
+        return True
+    
+    def execute_transaction(self, transaction: Transaction):
+        """Execute transaction by modifying the utxo
+
+        Args:
+            transaction (Transaction): Transaction object
+        """
+        for utxo in transaction.input_utxos:
+            del self.utxo_set[utxo.id]
+        
+        for utxo in transaction.output_utxos:
+            self.utxo_set[utxo.id] = utxo
+
+    def verify_block(self, block:Block):
+        """Verify if block can be added to the blockchain
+
+        Args:
+            block (Block): Block to be added
+
+        Returns:
+            bool: True if verified, else False
+        """
+        for transaction in self.transactions:
+            if self.verify_transaction(transaction):
+                return False
+
+        return True
+    
+    def create_fork(self, block:Block):
+        """Create fork for the newly added block
+
+        Args:
+            block (Block): New block to be added
+
+        Returns:
+            bool: True if the block is added, else False
+        """
+        if block.id not in self.blockchain.blocks.keys():    # If block already not exists
+            if self.blockchain.add_block(
+                parent_block_id = block.parent_block_id,
+                child_block = block
+            ):
+                for txn in block.transactions:
+                    del self.transactions[txn.id]
+                    self.execute_transaction(txn)
+
+                self.utxo_set[block.miner_utxo.id] = block.miner_utxo   # Coin base transaction   
+                return True
+        return False 
+        
+    def remove_block(self, block:Block):
+        pass
+
+
