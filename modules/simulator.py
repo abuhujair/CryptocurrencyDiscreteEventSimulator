@@ -79,7 +79,8 @@ class Simulator:
             parent_block_id=None,
             block_position=0,
             timestamp=0,
-            transactions=transactions
+            transactions=transactions,
+            block_creator=-1
         )
 
         nodes = {}
