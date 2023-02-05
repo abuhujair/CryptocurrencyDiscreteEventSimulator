@@ -137,10 +137,7 @@ class Node:
         return latency
     
     # ========================================================================================
-    # Miner functions
-    def add_utxo(self):
-        raise NotImplementedError
-    
+    # Miner functions    
     def mine_block(self, block:Block):
         """Operations performed after mining has completed
 
@@ -148,14 +145,10 @@ class Node:
             block (Block): New block to be added to the blockchain
         """
         self.blockchain.add_block(
-            parent_block_id=self.blockchain.current_block.id,
+            parent_block_id=block.parent_block_id,
             child_block=block,
         )
-        for txn in block.transactions:
-            del self.transactions[txn.id]
-            self.execute_transaction(txn)
-
-        self.utxo_set[block.miner_utxo.id] = block.miner_utxo   # Coin base transaction        
+        self.execute_block_utxo(block)
 
     def create_block(self):
         """Create block for mining
@@ -164,10 +157,10 @@ class Node:
             Block: Newly formed block
         """
         counter = 0
-        transactions = []
-        for txn_id in list(transactions.keys()):
+        txns = []
+        for txn_id in list(self.transactions.keys()):
             if self.verify_transaction(self.transactions[txn_id]):
-                transactions.append(self.transactions[txn_id])
+                txns.append(self.transactions[txn_id])
             else:
                 del self.transactions[txn_id]
             counter += 1
@@ -175,15 +168,15 @@ class Node:
                 break
         
         block = Block(
-            parent_block_id = -1,
+            parent_block_id = self.blockchain.current_block.id,
             block_position = self.blockchain.current_block.block_position + 1,
             timestamp = -1,
-            transactions = transactions,
+            transactions = txns,
             block_creator = self.id
         )
         return block 
 
-    def verify_transaction(self, transaction:Transaction):
+    def verify_transaction(self, transaction:Transaction, utxo_set: Dict[hashlib._hashlib.HASH, Utxo] = None):
         """Verify total incoming and outgoing utxo of the transaction
 
         Args:
@@ -192,12 +185,15 @@ class Node:
         Returns:
             bool: True for success, False for failure
         """
+        
+        if utxo_set == None:
+            utxo_set = self.utxo_set
         total_incoming = 0
         total_outgoing = 0
 
         # Check if all the utxo are valid by comparing them from the miner utxo set
         for utxo in transaction.input_utxos:
-            if not utxo.id in list(self.utxo_set.keys()):
+            if not utxo.id in list(utxo_set.keys()):
                 return False
             
         for utxo in transaction.input_utxos:
@@ -211,20 +207,40 @@ class Node:
         
         return True
     
-    def execute_transaction(self, transaction: Transaction):
+    def execute_transaction(self, transaction: Transaction, utxo_set: Dict[hashlib._hashlib.HASH, Utxo]):
         """Execute transaction by modifying the utxo
 
         Args:
             transaction (Transaction): Transaction object
+            utxo_set (Dict[hashlib._hashlib.HASH, Utxo], optional): utxo_set to be modified. Defaults to None.
         """
+        if utxo_set == None:   
+            utxo_set = self.utxo_set
+
         for utxo in transaction.input_utxos:
             del self.utxo_set[utxo.id]
         
         for utxo in transaction.output_utxos:
             self.utxo_set[utxo.id] = utxo
 
-    def verify_block(self, block:Block):
-        """Verify if block can be added to the blockchain
+    def remove_transaction( self, transaction:Transaction, utxo_set: Dict[hashlib._hashlib.HASH, Utxo]):
+        """remove transaction by modifying the utxo_set
+
+        Args:
+            transaction (Transaction): Transaction object
+            utxo_set (Dict[hashlib._hashlib.HASH, Utxo], optional): utxo_set to be modified. Defaults to None.
+        """
+        if utxo_set == None:   
+            utxo_set = self.utxo_set
+
+        for utxo in transaction.output_utxos:
+            del self.utxo_set[utxo.id]
+        
+        for utxo in transaction.input_utxos:
+            self.utxo_set[utxo.id] = utxo
+
+    def verify_block(self, block:Block, utxo_set: Dict[hashlib._hashlib.HASH, Utxo] = None):
+        """Verify if block can be added to the blockchain, for block received or created by it.
 
         Args:
             block (Block): Block to be added
@@ -232,35 +248,118 @@ class Node:
         Returns:
             bool: True if verified, else False
         """
-        for transaction in self.transactions:
-            if self.verify_transaction(transaction):
+        if utxo_set == None: #if primary chain is being verified
+            utxo_set = self.utxo_set
+        
+        for transaction in block.transactions:
+            if not self.verify_transaction(transaction):
                 return False
-
         return True
     
-    def create_fork(self, block:Block):
-        """Create fork for the newly added block
+    def execute_block_utxo(self, block: Block, utxo_set: Dict[hashlib._hashlib.HASH, Utxo] = None,
+                            transactions: Dict[hashlib._hashlib.HASH,Transaction] = None):
+        """Added new utxo by the block, and update the pending transaction pool
 
         Args:
-            block (Block): New block to be added
+            block (Block): Block Object
+            utxo_set (Dict[hashlib._hashlib.HASH, Utxo], optional): utxo_set. Defaults to None.
+            transactions (Dict[hashlib._hashlib.HASH,Transaction], optional): transactions. Defaults to None.
+        """
+        if utxo_set == None:
+            utxo_set = self.utxo_set
+        if transactions == None:
+            transactions = self.transactions
+
+        for txn in block.transactions:
+            del transactions[txn.id] #TODO How to handle this when we are only making copy of utxo
+            self.execute_transaction(txn,utxo_set)
+        self.utxo_set[block.miner_utxo.id] = block.miner_utxo   # Coin base transaction        
+
+    def remove_block_utxo(self, block: Block, utxo_set: Dict[hashlib._hashlib.HASH, Utxo] = None,
+                            transactions: Dict[hashlib._hashlib.HASH,Transaction] = None):
+        """Removes all the utxo created by block, and add utxo removed by the block when added to blockchain 
+        Args:
+            block (Block): Block Object
+            utxo_set (Dict[hashlib._hashlib.HASH, Utxo], optional): utxo_set. Defaults to None.
+            transactions (Dict[hashlib._hashlib.HASH,Transaction], optional): transactions. Defaults to None.
+        """
+        if utxo_set == None:
+            utxo_set = self.utxo_set
+        if transactions == None:
+            transactions = self.transactions
+
+        for transaction in block.transactions:
+            self.remove_transaction(transaction=transaction,utxo_set=utxo_set)
+            transactions[transaction.id] = transaction
+        del utxo_set[block.miner_utxo.id]
+
+    def receive_block(self, block:Block):
+        if block.id in self.blockchain.blocks.keys() and block.parent_block_id not in self.blockchain.blocks.keys():
+            return False
+
+        latest_block_position = self.blockchain.current_block.block_position
+        #TODO fork block verification will fail due to invalid utxo
+        if block.parent_block_id != self.blockchain.current_block.id: # This will lead to fork, or extension of forked chain.
+            #Since checkpointing is not implemented, fork and fork extension will be possible at any blocklength.
+            
+            utxo_set,transactions = self.create_new_utxo_set(block) #create new utxo_set for the forked chain
+            if self.verify_block(block,utxo_set):
+                self.blockchain.add_block(
+                    parent_block_id = block.parent_block_id,
+                    child_block = block)
+                if(block.block_position > latest_block_position): #If the chain is being switched, utxo_set need to be updated    
+                    self.utxo_set = utxo_set
+                    self.transactions = transactions
+                    self.execute_block_utxo(block)
+                return True
+            else:
+                return False
+
+        elif block.block_position > latest_block_position:    # verify block, and add chain to the block.
+            if self.verify_block(block):
+                self.blockchain.add_block(
+                    parent_block_id=block.parent_block_id,
+                    child_block=block
+                )
+                self.execute_block_utxo(block)
+                return True
+            else:
+                return False
+        return False
+
+    def create_new_utxo_set(self, block:Block):
+        """Creates a copy of utxo_set and pending transaction pool for the forked chain
+
+        Args:
+            block (Block): Block Object
 
         Returns:
-            bool: True if the block is added, else False
+            utxo_set: Dict[utxo_id, utxo]
+            txn_set: Dict[transactions_id, transaction]
         """
-        if block.id not in self.blockchain.blocks.keys():    # If block already not exists
-            if self.blockchain.add_block(
-                parent_block_id = block.parent_block_id,
-                child_block = block
-            ):
-                for txn in block.transactions:
-                    del self.transactions[txn.id]
-                    self.execute_transaction(txn)
+        utxo_set = self.utxo_set.copy()
+        txn_set = self.transactions.copy()
 
-                self.utxo_set[block.miner_utxo.id] = block.miner_utxo   # Coin base transaction   
-                return True
-        return False 
+        block_oc = self.blockchain.current_block #original_block_chain
+        length_oc = block_oc.block_position 
+        while length_oc >= block.block_position: #Removed all the utxo until the length of chain became equal.
+            self.remove_block_utxo(block_oc,utxo_set,txn_set)
         
-    def remove_block(self, block:Block):
-        pass
+            block_oc = self.blockchain.blocks[block_oc.parent_block_id]
+            length_oc = block_oc.block_position
 
+        block_nc = self.blockchain.blocks[block.parent_block_id] #new_block_chain
+        block_to_be_added = []
+        while block_oc != block_nc: #Remove utxo until fork point
+            self.remove_block_utxo(block_oc,utxo_set,txn_set)
+            
+            block_to_be_added.append(block_nc.id)
+            block_oc = self.blockchain.blocks[block_oc.parent_block_id]
+            length_oc = block_oc.block_position
+            block_nc = self.blockchain.blocks[block_nc.parent_block_id]
 
+        while block_to_be_added != []: #add utxo until chain is new chain is created
+            block_add = self.blockchain.blocks[block_to_be_added.pop()]
+            self.execute_block_utxo(block_add,utxo_set,txn_set)
+        
+        return utxo_set,txn_set
