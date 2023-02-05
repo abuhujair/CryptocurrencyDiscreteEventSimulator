@@ -294,7 +294,7 @@ class Node:
         del utxo_set[block.miner_utxo.id]
 
     def receive_block(self, block:Block):
-        if block.id in self.blockchain.blocks.keys() and block.parent_block_id not in self.blockchain.blocks.keys():
+        if block.id in self.blockchain.blocks.keys() or block.parent_block_id not in self.blockchain.blocks.keys():
             return False
 
         latest_block_position = self.blockchain.current_block.block_position
