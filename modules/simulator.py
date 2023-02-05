@@ -45,6 +45,9 @@ class Simulator:
 
         self.run_simulation(simulation_time=simulation_time)
 
+        for node in list(self.nodes.values()):
+            print(node.blockchain)
+
     # ==========================================================================================
     # Peer network
     def create_nodes(self):

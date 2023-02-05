@@ -132,11 +132,16 @@ class EventHandler:
 
         elif event.type == 5:   # Receive block
             block = event.extra_parameters['block']
+            event_creator_node = event.extra_parameters['event_creator']
             if event.node.receive_block(block):
                 # Propagate the block
                 for peer_id in event.node.peers:
+                    if peer_id == event_creator_node:   # Circular dependency
+                        continue
+
                     message_length = (len(block.transactions) + 1)*0.008
                     latency = event.node.get_latency(self.nodes[peer_id], message_length)
+                    self.logger.critical(f"{round(event.time + latency, 4)}\t\t{latency}\t\t{event.time}")
                     
                     self.add_event(Event(
                         event_time=round(event.time + latency, 4),
