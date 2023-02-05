@@ -11,24 +11,34 @@ from modules.blockchain import Block, Transaction, Utxo
 class Simulator:
     """Simulator instance
     """
-    def __init__(self, num_nodes:int , slow_nodes:float, inter_arrival_time:float, simulation_time:float):
+    def __init__(self, num_nodes:int , slow_nodes:float, inter_arrival_time:float, inter_arrival_time_block:float , simulation_time:float):
         self.num_nodes = num_nodes
         self.num_slow_nodes = int(num_nodes*slow_nodes)
         self.iat = inter_arrival_time
-        
+        self.iat_block = inter_arrival_time_block
+
+        self.gen_exp = np.random.default_rng()  # Exponential distribution generator
         # Create peer network
         self.nodes = self.create_nodes()    # Dictionary [id: Node]
         self.create_network()
         
         self.event_queue = list()
-        self.event_handler = EventHandler(self.event_queue, self.nodes, self.iat)
-        self.gen_exp = np.random.default_rng()  # Exponential distribution generator
-
-        # Initialize events
+        self.event_handler = EventHandler(self.event_queue, self.nodes, self.iat, self.iat_block)
+    
+        # Initialize first transaction events
         for node in self.nodes.values():
             new_event = Event(
                 event_time = float("{:.2f}".format(self.gen_exp.exponential(self.iat))),
                 event_type = 1, # Create transaction
+                event_node = node
+            )
+            self.event_handler.add_event(new_event)
+
+        # Initialize first mining events
+        for node in self.nodes.values():
+            new_event = Event(
+                event_time = float("{:.2f}".format(self.gen_exp.exponential(self.iat*30))),
+                event_type = 3, # Create transaction
                 event_node = node
             )
             self.event_handler.add_event(new_event)
@@ -75,11 +85,14 @@ class Simulator:
         nodes = {}
         random_index = random.sample(range(self.num_nodes),self.num_nodes)
 
+        hash = list(self.gen_exp.uniform(0.0,1.0,self.num_nodes))
+        hash = [i/sum(hash) for i in hash]
+
         for i in random_index[0:self.num_slow_nodes]:   # SLOW nodes
-            nodes[i] = Node(node_id=i, node_type=0, genesis_block=genesis_block, utxo_set=utxo_set)
+            nodes[i] = Node(node_id=i, node_type=0, genesis_block=genesis_block, utxo_set=utxo_set,hash = hash[i])
         
         for i in random_index[self.num_slow_nodes:self.num_nodes]:  # FAST nodes
-            nodes[i] = Node(node_id=i, node_type=1, genesis_block=genesis_block, utxo_set=utxo_set)
+            nodes[i] = Node(node_id=i, node_type=1, genesis_block=genesis_block, utxo_set=utxo_set,hash = hash[i])
         return nodes
 
     def create_network(self):
