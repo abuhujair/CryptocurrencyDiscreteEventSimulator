@@ -115,3 +115,22 @@ class Blockchain:
             or child_block.block_position > self.current_block.block_position +1 ): #a new block is added to forked chain
             self.current_block = child_block
         return True
+    
+    def __str__(self) -> str:
+        nodes = {}
+        id_mapping = {}
+        counter  = 0
+        for node in list(self.blocks.values()):
+            id_mapping[node.id] = counter
+            counter += 1
+
+        for node in list(self.blocks.values()):
+            try:
+                if id_mapping[node.parent_block_id] in nodes.keys():
+                    nodes[id_mapping[node.parent_block_id]].append(id_mapping[node.id])
+                else:
+                    nodes[id_mapping[node.parent_block_id]] = [id_mapping[node.id]]
+            except:
+                pass
+
+        return f"{nodes}"
