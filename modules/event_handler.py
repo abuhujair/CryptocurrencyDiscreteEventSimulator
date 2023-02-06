@@ -122,13 +122,13 @@ class EventHandler:
                         event_creator = event.node
                     )) 
             
-            new_block = event.node.create_block()
-            self.add_event(Event(
-                event_time=round(event.time+self.gen_exp.exponential(self.iat_b/event.node.hash),4),
-                event_type=4,
-                event_node=event.node,
-                block=new_block
-            ))
+                new_block = event.node.create_block()
+                self.add_event(Event(
+                    event_time=round(event.time+self.gen_exp.exponential(self.iat_b/event.node.hash),4),
+                    event_type=4,
+                    event_node=event.node,
+                    block=new_block
+                ))
 
         elif event.type == 5:   # Receive block
             block = event.extra_parameters['block']
@@ -150,3 +150,12 @@ class EventHandler:
                         block = block,
                         event_creator = event.node
                     )) 
+
+                new_block = event.node.create_block()
+                self.add_event(Event(
+                    event_time=round(event.time+self.gen_exp.exponential(self.iat_b/event.node.hash),4),
+                    event_type=4,
+                    event_node=event.node,
+                    block=new_block
+                ))
+
