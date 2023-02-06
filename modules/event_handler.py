@@ -50,7 +50,6 @@ class EventHandler:
 
     def handle_event(self, event:Event):
         self.logger.info(event)
-        # print(event)
 
         if event.type == 1: # Create transaction
             while True:
@@ -123,22 +122,19 @@ class EventHandler:
                         event_creator = event.node
                     )) 
             
-                new_block = event.node.create_block()
-                self.add_event(Event(
-                    event_time=round(event.time+self.gen_exp.exponential(self.iat_b/event.node.hash),4),
-                    event_type=4,
-                    event_node=event.node,
-                    block=new_block
-                ))
+            new_block = event.node.create_block()
+            self.add_event(Event(
+                event_time=round(event.time+self.gen_exp.exponential(self.iat_b/event.node.hash),4),
+                event_type=4,
+                event_node=event.node,
+                block=new_block
+            ))
 
         elif event.type == 5:   # Receive block
             block = event.extra_parameters['block']
-            event_creator_node = event.extra_parameters['event_creator']
             if event.node.receive_block(block):
                 # Propagate the block
                 for peer_id in event.node.peers:
-                    if peer_id == event_creator_node:
-                        continue
                     message_length = (len(block.transactions) + 1)*0.008
                     latency = event.node.get_latency(self.nodes[peer_id], message_length)
                     
@@ -149,10 +145,3 @@ class EventHandler:
                         block = block,
                         event_creator = event.node
                     )) 
-                new_block = event.node.create_block()
-                self.add_event(Event(
-                    event_time=round(event.time+self.gen_exp.exponential(self.iat_b/event.node.hash),4),
-                    event_type=4,
-                    event_node=event.node,
-                    block=new_block
-                ))
