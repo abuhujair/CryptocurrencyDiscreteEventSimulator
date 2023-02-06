@@ -2,6 +2,7 @@ import random
 import numpy as np
 import heapq
 from typing import List
+import copy
 
 from modules.network import Node
 from modules.event_handler import Event, EventHandler
@@ -68,14 +69,15 @@ class Simulator:
                 value=coins,
                 timestamp=0,
             )
-            transactions.append(new_transaction)
-            
+        
             new_utxo = Utxo(
                 new_transaction.id,
                 owner=i,
                 value=coins
             )
+            new_transaction.add_utxos(input_utxos=None, output_utxos=[new_utxo])
 
+            transactions.append(new_transaction)
             utxo_set[new_utxo.id] = new_utxo
 
         genesis_block = Block(
@@ -93,10 +95,10 @@ class Simulator:
         hash = [i/sum(hash) for i in hash]
 
         for i in random_index[0:self.num_slow_nodes]:   # SLOW nodes
-            nodes[i] = Node(node_id=i, node_type=0, genesis_block=genesis_block, utxo_set=utxo_set,hash = hash[i])
+            nodes[i] = Node(node_id=i, node_type=0, genesis_block=copy.deepcopy(genesis_block), utxo_set=copy.deepcopy(utxo_set),hash = hash[i])
         
         for i in random_index[self.num_slow_nodes:self.num_nodes]:  # FAST nodes
-            nodes[i] = Node(node_id=i, node_type=1, genesis_block=genesis_block, utxo_set=utxo_set,hash = hash[i])
+            nodes[i] = Node(node_id=i, node_type=1, genesis_block=copy.deepcopy(genesis_block), utxo_set=copy.deepcopy(utxo_set),hash = hash[i])
         return nodes
 
     def create_network(self):
