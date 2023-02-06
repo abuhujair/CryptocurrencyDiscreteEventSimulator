@@ -3,18 +3,21 @@ import random
 from typing import Dict
 import hashlib
 import numpy as np
+import copy
 
 from modules.blockchain import Blockchain, Block, Utxo, Transaction
 
 class Node:
     """Node object for the blockchain
     """
-    def __init__(self, node_id: int, node_type: int, genesis_block:Block, utxo_set:Dict[hashlib._hashlib.HASH, Utxo], hash):
+    def __init__(self, node_id: int, node_type: int, genesis_block:Block, utxo_set:Dict[str, Utxo], hash):
         """Node object
 
         Args:
             node_id (int): Unique id for the node
             node_type (int): 0 - Slow, 1 - Fast 
+            genesis_block (Block): Genesis block of the blockchain
+            utxo_set (Dict[str, Utxo]): Utxo set of the miner
         """
         self.id = node_id
         self.type = node_type
@@ -28,7 +31,7 @@ class Node:
         self.own_utxo = list()  # Nodes own money
         for utxo in list(utxo_set.values()):
             if utxo.owner == self.id:
-                self.own_utxo.append(utxo)
+                self.own_utxo.append(copy.deepcopy(utxo))
 
         self.propagation_delays = {}
         self.hash = hash
@@ -80,9 +83,15 @@ class Node:
         current_value = 0
         for utxo in self.own_utxo:
             current_value += utxo.value
-            input_utxos.append(utxo)
+            input_utxos.append(copy.deepcopy(utxo))
             if current_value >= value:
                 break
+
+        for utxo in input_utxos:
+            for utx in self.own_utxo:
+                if utx.id == utxo.id:
+                    self.own_utxo.remove(utx)
+                    break
 
         money_back = current_value - value
         output_utxos = list()
@@ -91,6 +100,7 @@ class Node:
             owner=self.id,
             value=money_back
         ))
+        self.own_utxo.append(copy.deepcopy(output_utxos[0]))
 
         output_utxos.append(Utxo(   # paid utxo
             transaction_id=new_transaction.id,
@@ -167,6 +177,7 @@ class Node:
             if counter == 999:
                 break
         
+        #TODO add timestamp
         block = Block(
             parent_block_id = self.blockchain.current_block.id,
             block_position = self.blockchain.current_block.block_position + 1,
@@ -176,12 +187,13 @@ class Node:
         )
         return block 
 
-    def verify_transaction(self, transaction:Transaction, utxo_set: Dict[hashlib._hashlib.HASH, Utxo] = None):
+    def verify_transaction(self, transaction:Transaction, utxo_set: Dict[str, Utxo] = None):
         """Verify total incoming and outgoing utxo of the transaction
 
         Args:
             transaction (Transaction): Transaction object
-
+            utxo_set (Dict[str, Utxo]): Utxo set of the miner
+            
         Returns:
             bool: True for success, False for failure
         """
@@ -202,48 +214,55 @@ class Node:
         for utxo in transaction.output_utxos:
             total_outgoing += utxo.value
 
-        if total_incoming != total_outgoing + transaction.value or total_incoming < 0:  # Total incoming = Total outgoing
+        if total_incoming != total_outgoing or total_incoming < 0:  # Total incoming = Total outgoing
+            return False
+        
+        if not transaction.id in self.transactions.keys():
             return False
         
         return True
     
-    def execute_transaction(self, transaction: Transaction, utxo_set: Dict[hashlib._hashlib.HASH, Utxo]):
+    def execute_transaction(self, transaction: Transaction, utxo_set: Dict[str, Utxo]):
         """Execute transaction by modifying the utxo
 
         Args:
             transaction (Transaction): Transaction object
-            utxo_set (Dict[hashlib._hashlib.HASH, Utxo], optional): utxo_set to be modified. Defaults to None.
+            utxo_set (Dict[str, Utxo], optional): utxo_set to be modified. Defaults to None.
         """
         if utxo_set == None:   
             utxo_set = self.utxo_set
 
         for utxo in transaction.input_utxos:
-            del self.utxo_set[utxo.id]
+            del utxo_set[utxo.id]
         
         for utxo in transaction.output_utxos:
-            self.utxo_set[utxo.id] = utxo
+            utxo_set[utxo.id] = utxo
+            if utxo.owner == self.id:
+                self.own_utxo.append(copy.deepcopy(utxo))
 
-    def remove_transaction( self, transaction:Transaction, utxo_set: Dict[hashlib._hashlib.HASH, Utxo]):
+
+    def remove_transaction( self, transaction:Transaction, utxo_set: Dict[str, Utxo]):
         """remove transaction by modifying the utxo_set
 
         Args:
             transaction (Transaction): Transaction object
-            utxo_set (Dict[hashlib._hashlib.HASH, Utxo], optional): utxo_set to be modified. Defaults to None.
+            utxo_set (Dict[str, Utxo], optional): utxo_set to be modified. Defaults to None.
         """
         if utxo_set == None:   
             utxo_set = self.utxo_set
 
         for utxo in transaction.output_utxos:
-            del self.utxo_set[utxo.id]
+            del utxo_set[utxo.id]
         
         for utxo in transaction.input_utxos:
-            self.utxo_set[utxo.id] = utxo
+            utxo_set[utxo.id] = utxo
 
-    def verify_block(self, block:Block, utxo_set: Dict[hashlib._hashlib.HASH, Utxo] = None):
+    def verify_block(self, block:Block, utxo_set: Dict[str, Utxo] = None):
         """Verify if block can be added to the blockchain, for block received or created by it.
 
         Args:
             block (Block): Block to be added
+            utxo_set (Dict[str, Utxo]): Utxo set of the miner
 
         Returns:
             bool: True if verified, else False
@@ -256,14 +275,14 @@ class Node:
                 return False
         return True
     
-    def execute_block_utxo(self, block: Block, utxo_set: Dict[hashlib._hashlib.HASH, Utxo] = None,
-                            transactions: Dict[hashlib._hashlib.HASH,Transaction] = None):
+    def execute_block_utxo(self, block: Block, utxo_set: Dict[str, Utxo] = None,
+                            transactions: Dict[str,Transaction] = None):
         """Added new utxo by the block, and update the pending transaction pool
 
         Args:
             block (Block): Block Object
-            utxo_set (Dict[hashlib._hashlib.HASH, Utxo], optional): utxo_set. Defaults to None.
-            transactions (Dict[hashlib._hashlib.HASH,Transaction], optional): transactions. Defaults to None.
+            utxo_set (Dict[str, Utxo], optional): utxo_set. Defaults to None.
+            transactions (Dict[str,Transaction], optional): transactions. Defaults to None.
         """
         if utxo_set == None:
             utxo_set = self.utxo_set
@@ -273,15 +292,15 @@ class Node:
         for txn in block.transactions:
             del transactions[txn.id] #TODO How to handle this when we are only making copy of utxo
             self.execute_transaction(txn,utxo_set)
-        self.utxo_set[block.miner_utxo.id] = block.miner_utxo   # Coin base transaction        
+        utxo_set[block.miner_utxo.id] = block.miner_utxo   # Coin base transaction        
 
-    def remove_block_utxo(self, block: Block, utxo_set: Dict[hashlib._hashlib.HASH, Utxo] = None,
-                            transactions: Dict[hashlib._hashlib.HASH,Transaction] = None):
+    def remove_block_utxo(self, block: Block, utxo_set: Dict[str, Utxo] = None,
+                            transactions: Dict[str,Transaction] = None):
         """Removes all the utxo created by block, and add utxo removed by the block when added to blockchain 
         Args:
             block (Block): Block Object
-            utxo_set (Dict[hashlib._hashlib.HASH, Utxo], optional): utxo_set. Defaults to None.
-            transactions (Dict[hashlib._hashlib.HASH,Transaction], optional): transactions. Defaults to None.
+            utxo_set (Dict[str, Utxo], optional): utxo_set. Defaults to None.
+            transactions (Dict[str,Transaction], optional): transactions. Defaults to None.
         """
         if utxo_set == None:
             utxo_set = self.utxo_set
@@ -290,7 +309,7 @@ class Node:
 
         for transaction in block.transactions:
             self.remove_transaction(transaction=transaction,utxo_set=utxo_set)
-            transactions[transaction.id] = transaction
+            transactions[transaction.id] = copy.deepcopy(transaction)
         del utxo_set[block.miner_utxo.id]
 
     def receive_block(self, block:Block):
@@ -337,8 +356,8 @@ class Node:
             utxo_set: Dict[utxo_id, utxo]
             txn_set: Dict[transactions_id, transaction]
         """
-        utxo_set = self.utxo_set.copy()
-        txn_set = self.transactions.copy()
+        utxo_set = copy.deepcopy(self.utxo_set)
+        txn_set = copy.deepcopy(self.transactions)
 
         block_oc = self.blockchain.current_block #original_block_chain
         length_oc = block_oc.block_position 

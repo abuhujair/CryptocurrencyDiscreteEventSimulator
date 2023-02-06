@@ -107,7 +107,7 @@ class EventHandler:
         elif event.type == 4:   # Mining end
             latest_block_number = event.node.blockchain.current_block.block_position
             block = event.extra_parameters['block']
-            if block.block_position >= latest_block_number:
+            if block.block_position > latest_block_number:
                 event.node.mine_block(block)
                 # Propagate the block
                 for peer_id in event.node.peers:
