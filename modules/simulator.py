@@ -12,11 +12,13 @@ from modules.blockchain import Block, Transaction, Utxo
 class Simulator:
     """Simulator instance
     """
-    def __init__(self, num_nodes:int , slow_nodes:float, inter_arrival_time:float, inter_arrival_time_block:float , simulation_time:float):
+    def __init__(self, num_nodes:int , slow_nodes:float, inter_arrival_time:float,
+                    inter_arrival_time_block:float , simulation_time:float, MAX_BLOCK_LENGTH: int):
         self.num_nodes = num_nodes
         self.num_slow_nodes = int(num_nodes*slow_nodes)
         self.iat = inter_arrival_time
         self.iat_block = inter_arrival_time_block
+        self.MAX_BLOCK_LENGTH = MAX_BLOCK_LENGTH
 
         self.gen_exp = np.random.default_rng()  # Exponential distribution generator
         # Create peer network
@@ -95,10 +97,19 @@ class Simulator:
         hash = [i/sum(hash) for i in hash]
 
         for i in random_index[0:self.num_slow_nodes]:   # SLOW nodes
-            nodes[i] = Node(node_id=i, node_type=0, genesis_block=copy.deepcopy(genesis_block), utxo_set=copy.deepcopy(utxo_set),hash = hash[i])
+            nodes[i] = Node(node_id=i, 
+                            node_type=0, 
+                            genesis_block=copy.deepcopy(genesis_block), 
+                            utxo_set=copy.deepcopy(utxo_set),hash = hash[i],
+                            MAX_BLOCK_LENGTH=self.MAX_BLOCK_LENGTH)
         
         for i in random_index[self.num_slow_nodes:self.num_nodes]:  # FAST nodes
-            nodes[i] = Node(node_id=i, node_type=1, genesis_block=copy.deepcopy(genesis_block), utxo_set=copy.deepcopy(utxo_set),hash = hash[i])
+            nodes[i] = Node(node_id=i, 
+                            node_type=1, 
+                            genesis_block=copy.deepcopy(genesis_block), 
+                            utxo_set=copy.deepcopy(utxo_set),
+                            hash = hash[i],
+                            MAX_BLOCK_LENGTH=self.MAX_BLOCK_LENGTH)
         return nodes
 
     def create_network(self):

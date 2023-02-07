@@ -7,5 +7,6 @@ if __name__ == '__main__':
         slow_nodes=0.5,
         inter_arrival_time = 1.0,
         inter_arrival_time_block = 100.0,
-        simulation_time = 500
+        simulation_time = 500,
+        MAX_BLOCK_LENGTH=1000
     )

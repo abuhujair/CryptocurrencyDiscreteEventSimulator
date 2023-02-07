@@ -144,9 +144,11 @@ class Blockchain:
         for node in list(self.blocks.values()):
             try:
                 if id_mapping[node.parent_block_id] in nodes.keys():
-                    nodes[id_mapping[node.parent_block_id]].append((id_mapping[node.id],node.block_position,node.id))
+                    nodes[id_mapping[node.parent_block_id]].append(("BlockID:"+node.parent_block_id,"NodePosition:"+str(node.block_position),
+                        "NumberTXNs:"+str(len(node.transactions)),"ChildBlockID"+node.id,"ChildBlockNode"+str(id_mapping[node.id])))
                 else:
-                    nodes[id_mapping[node.parent_block_id]] = [(id_mapping[node.id],node.block_position,node.id)]
+                    nodes[id_mapping[node.parent_block_id]] = [("BlockID:"+node.parent_block_id,"NodePosition:"+str(node.block_position),
+                        "NumberTXNs:"+str(len(node.transactions)),"ChildBlockID"+node.id,"ChildBlockNode"+str(id_mapping[node.id]))]
             except:
                 pass
 
