@@ -144,9 +144,9 @@ class Blockchain:
         for node in list(self.blocks.values()):
             try:
                 if id_mapping[node.parent_block_id] in nodes.keys():
-                    nodes[id_mapping[node.parent_block_id]].append((id_mapping[node.id],node.block_position))
+                    nodes[id_mapping[node.parent_block_id]].append((id_mapping[node.id],node.block_position,node.id))
                 else:
-                    nodes[id_mapping[node.parent_block_id]] = [(id_mapping[node.id],node.block_position)]
+                    nodes[id_mapping[node.parent_block_id]] = [(id_mapping[node.id],node.block_position,node.id)]
             except:
                 pass
 
