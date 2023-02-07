@@ -2,6 +2,7 @@ import heapq
 from typing import List, Dict
 import random
 import numpy as np
+import copy
 
 from modules.network import Node
 from utils.logger import get_logger
@@ -66,7 +67,7 @@ class EventHandler:
                     event_time=round(event.time + latency,4),
                     event_type=2,
                     event_node=self.nodes[peer_id],
-                    transaction = new_transaction,
+                    transaction = copy.deepcopy(new_transaction),
                     event_creator = event.node
                 )) 
 
@@ -91,7 +92,7 @@ class EventHandler:
                         event_time=round(event.time + latency,4),
                         event_type=2,
                         event_node=self.nodes[peer_id],
-                        transaction = transaction,
+                        transaction = copy.deepcopy(transaction),
                         event_creator = event.node
                     )) 
 
@@ -105,10 +106,10 @@ class EventHandler:
             ))
 
         elif event.type == 4:   # Mining end
+            print(event)
             latest_block_number = event.node.blockchain.current_block.block_position
             block = event.extra_parameters['block']
-            if block.block_position > latest_block_number:
-                event.node.mine_block(block)
+            if block.block_position == latest_block_number+1 and event.node.mine_block(block,event.time):
                 # Propagate the block
                 for peer_id in event.node.peers:
                     message_length = (len(block.transactions) + 1)*0.008
@@ -118,7 +119,7 @@ class EventHandler:
                         event_time=round(event.time + latency, 4),
                         event_type=5,
                         event_node=self.nodes[peer_id],
-                        block = block,
+                        block = copy.deepcopy(block),
                         event_creator = event.node
                     )) 
             
@@ -129,8 +130,11 @@ class EventHandler:
                     event_node=event.node,
                     block=new_block
                 ))
+            for node in list(self.nodes.values()):
+                print(node.id,node.blockchain)
 
         elif event.type == 5:   # Receive block
+            print(event)
             block = event.extra_parameters['block']
             event_creator_node = event.extra_parameters['event_creator']
             if event.node.receive_block(block):
@@ -141,13 +145,13 @@ class EventHandler:
 
                     message_length = (len(block.transactions) + 1)*0.008
                     latency = event.node.get_latency(self.nodes[peer_id], message_length)
-                    self.logger.critical(f"{round(event.time + latency, 4)}\t\t{latency}\t\t{event.time}")
+                    # self.logger.critical(f"{round(event.time + latency, 4)}\t\t{latency}\t\t{event.time}")
                     
                     self.add_event(Event(
                         event_time=round(event.time + latency, 4),
                         event_type=5,
                         event_node=self.nodes[peer_id],
-                        block = block,
+                        block = copy.deepcopy(block),
                         event_creator = event.node
                     )) 
 
@@ -158,4 +162,7 @@ class EventHandler:
                     event_node=event.node,
                     block=new_block
                 ))
+            for node in list(self.nodes.values()):
+                print(node.blockchain)
+
 

@@ -22,7 +22,7 @@ def get_logger(logger_name:str):
     logger.addHandler(console_handler)
 
     if logger_name in settings.LOG_FILE_PATHS.keys():
-        path = f"{settings.LOG_FILE_PATHS[logger_name]}_{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+        path = f"{settings.LOG_FILE_PATHS[logger_name]}_{datetime.now().strftime('%Y%m%d%H%M%S')}"
     else:
         path = settings.LOG_FILE_PATHS['DEFAULT']
     file_handler = logging.FileHandler(path)

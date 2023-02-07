@@ -1,8 +1,8 @@
 from __future__ import annotations
 import hashlib
 from typing import List, Dict
-import networkx as nx
-import matplotlib.pyplot as plt
+# import networkx as nx
+# import matplotlib.pyplot as plt
 
 
 class Utxo:
