@@ -27,7 +27,16 @@ class Event:
         return self.time < other.time
     
     def __str__(self):
-        return f"EVENT : {self.time}s-Type:{self.type}-NodeId:{self.node.id}-{self.extra_parameters}"
+        if self.type == 1:
+            return f"EVENT : {self.time}s-Type:{self.type}-NodeId:{self.node.id}"
+        if self.type == 2:
+            return f"EVENT : {self.time}s-Type:{self.type}-NodeId:{self.node.id}-Transaction:{self.extra_parameters['transaction'].id}-EventCreator:{self.extra_parameters['event_creator'].id}"
+        if self.type == 3:
+            return f"EVENT : {self.time}s-Type:{self.type}-NodeId:{self.node.id}"
+        if self.type == 4:
+            return f"EVENT : {self.time}s-Type:{self.type}-NodeId:{self.node.id}-Block:{self.extra_parameters['block'].id}"
+        if self.type == 5:
+            return f"EVENT : {self.time}s-Type:{self.type}-NodeId:{self.node.id}-Block:{self.extra_parameters['block'].id}-EventCreator:{self.extra_parameters['event_creator'].id}"
     
 
 class EventHandler:
@@ -130,8 +139,8 @@ class EventHandler:
                     event_node=event.node,
                     block=new_block
                 ))
-            for node in list(self.nodes.values()):
-                print(node.id,node.blockchain)
+            # for node in list(self.nodes.values()):
+            #     print(node.id,node.blockchain)
 
         elif event.type == 5:   # Receive block
             print(event)
@@ -162,7 +171,7 @@ class EventHandler:
                     event_node=event.node,
                     block=new_block
                 ))
-            for node in list(self.nodes.values()):
-                print(node.blockchain)
+            # for node in list(self.nodes.values()):
+            #     print(node.blockchain)
 
 

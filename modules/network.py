@@ -111,7 +111,7 @@ class Node:
 
         for utxo in input_utxos:
             del self.own_utxo[utxo.id]
-            self.own_utxo_u[utxo.id] #indicating the utxo has been used.
+            self.own_utxo_u[utxo.id] = utxo #indicating the utxo has been used.
 
         money_back = current_value - value
         output_utxos = list()
@@ -162,7 +162,7 @@ class Node:
             block (Block): New block to be added to the blockchain
         """
         block.timestamp = timestamp
-        if self.blockchain.add_block(
+        if self.verify_block(block) and self.blockchain.add_block(
             parent_block_id=block.parent_block_id,
             child_block=block,
         ):
@@ -178,7 +178,14 @@ class Node:
         """
         counter = 0
         txns = []
+        utxo_block = []
         for txn_id in list(self.transactions.keys()):
+            # Condition to check if same utxo is part of multiple transactions.
+            for utxo in self.transactions[txn_id].input_utxos:
+                if utxo.id not in utxo_block:
+                    utxo_block.append(utxo.id)
+                else:
+                    continue
             if self.verify_transaction(self.transactions[txn_id], self.utxo_set):
                 txns.append(copy.deepcopy(self.transactions[txn_id]))
             else:
