@@ -1,7 +1,6 @@
 from __future__ import annotations
 import random
 from typing import Dict
-import hashlib
 import numpy as np
 import copy
 
@@ -10,7 +9,8 @@ from modules.blockchain import Blockchain, Block, Utxo, Transaction
 class Node:
     """Node object for the blockchain
     """
-    def __init__(self, node_id: int, node_type: int, genesis_block:Block, utxo_set:Dict[str, Utxo], hash):
+    def __init__(self, node_id: int, node_type: int, genesis_block:Block, 
+                    utxo_set:Dict[str, Utxo], hash:float, MAX_BLOCK_LENGTH:int):
         """Node object
 
         Args:
@@ -21,22 +21,20 @@ class Node:
         """
         self.id = node_id
         self.type = node_type
+        self.MAX_BLOCK_LENGTH = MAX_BLOCK_LENGTH
 
         self.num_peers = random.randint(4,8)    # Fixed number of peers
         self.peers = [] # list of node ids
+        self.propagation_delays = {}
+        self.hash = hash
 
         self.blockchain = Blockchain(genesis_block)
         self.utxo_set = utxo_set  # Dict[utxo_id, Utxo]
-        self.utxo_set_u = {} # Dict[utxo_id, Utxo] unverified
 
         self.own_utxo = dict()  # Nodes own money
-        self.own_utxo_u = dict() #Nodes own money used in some transactions
         for utxo in list(utxo_set.values()):
             if utxo.owner == self.id:
                 self.own_utxo[utxo.id] = utxo
-
-        self.propagation_delays = {}
-        self.hash = hash
 
         self.transactions = dict()  # [transaction_id, Transaction]
         self.gen_exp = np.random.default_rng()
@@ -111,7 +109,6 @@ class Node:
 
         for utxo in input_utxos:
             del self.own_utxo[utxo.id]
-            self.own_utxo_u[utxo.id] = utxo #indicating the utxo has been used.
 
         money_back = current_value - value
         output_utxos = list()
@@ -191,7 +188,7 @@ class Node:
             else:
                 del self.transactions[txn_id]
             counter += 1
-            if counter == 999:
+            if counter == self.MAX_BLOCK_LENGTH-1:
                 break
         
         block = Block(
@@ -234,7 +231,7 @@ class Node:
         return True
     
     def execute_transaction(self, transaction: Transaction, utxo_set: Dict[str, Utxo], 
-                            own_utxo:Dict[str,Utxo], own_utxo_u:Dict[str,Utxo]):
+                            own_utxo:Dict[str,Utxo]):
         """Execute transaction by modifying the utxo
 
         Args:
@@ -244,8 +241,6 @@ class Node:
 
         for utxo in transaction.input_utxos:
             del utxo_set[utxo.id]
-            if utxo.owner == self.id:
-                del own_utxo_u[utxo.id] #If input_utxo is current node, then utxo would be in own_utxo_u
         
         for utxo in transaction.output_utxos:
             utxo_set[utxo.id] = utxo
@@ -253,7 +248,7 @@ class Node:
                 own_utxo[utxo.id] = utxo
 
     def remove_transaction( self, transaction:Transaction, utxo_set: Dict[str, Utxo],
-                            own_utxo:Dict[str,Utxo], own_utxo_u:Dict[str, Utxo]):
+                            own_utxo:Dict[str,Utxo]):
         """remove transaction by modifying the utxo_set
 
         Args:
@@ -268,8 +263,6 @@ class Node:
         
         for utxo in transaction.input_utxos:
             utxo_set[utxo.id] = utxo
-            if utxo.owner == self.id:
-                own_utxo[utxo.id] = utxo
 
     def verify_block(self, block:Block, utxo_set: Dict[str, Utxo] = None):
         """Verify if block can be added to the blockchain, for block received or created by it.
@@ -297,7 +290,7 @@ class Node:
         return True
     
     def execute_block_utxo(self, block: Block, utxo_set: Dict[str, Utxo] = None, transactions: Dict[str,Transaction] = None,
-            own_utxo: Dict[str,Utxo] = None, own_utxo_u:Dict[str,Utxo] = None):
+            own_utxo: Dict[str,Utxo] = None):
         """Added new utxo by the block, and update the pending transaction pool
 
         Args:
@@ -311,12 +304,10 @@ class Node:
             transactions = self.transactions
         if own_utxo == None:
             own_utxo = self.own_utxo
-        if own_utxo_u == None:
-            own_utxo_u = self.own_utxo_u
 
         for txn in block.transactions:
             del transactions[txn.id]
-            self.execute_transaction(txn,utxo_set,own_utxo, own_utxo_u)
+            self.execute_transaction(txn,utxo_set,own_utxo)
         
         # Coin base transaction
         utxo_set[block.miner_utxo.id] = block.miner_utxo
@@ -324,7 +315,7 @@ class Node:
             own_utxo[block.miner_utxo.id] = block.miner_utxo
 
     def remove_block_utxo(self, block: Block, utxo_set: Dict[str, Utxo] = None, transactions: Dict[str,Transaction] = None, 
-                own_utxo: Dict[str,Transaction] = None, own_utxo_u:Dict[str,Utxo] = None):
+                own_utxo: Dict[str,Transaction] = None):
         """Removes all the utxo created by block, and add utxo removed by the block when added to blockchain 
         Args:
             block (Block): Block Object
@@ -337,11 +328,9 @@ class Node:
             transactions = self.transactions
         if own_utxo == None:
             own_utxo = self.own_utxo
-        if own_utxo_u == None:
-            own_utxo_u = self.own_utxo_u
 
         for transaction in block.transactions:
-            self.remove_transaction(transaction,utxo_set, own_utxo,own_utxo_u)
+            self.remove_transaction(transaction,utxo_set, own_utxo)
             transactions[transaction.id] = transaction
         #Coinbase Transaction
         del utxo_set[block.miner_utxo.id]
@@ -356,7 +345,7 @@ class Node:
         #TODO fork block verification will fail due to invalid utxo
         if block.parent_block_id != self.blockchain.current_block.id: # This will lead to fork, or extension of forked chain.
             #Since checkpointing is not implemented, fork and fork extension will be possible at any blocklength.
-            utxo_set,transactions,own_utxo, own_utxo_u = self.create_new_utxo_set(block) #create new utxo_set for the forked chain
+            utxo_set,transactions,own_utxo = self.create_new_utxo_set(block) #create new utxo_set for the forked chain
             if self.verify_block(block,utxo_set):
                 self.blockchain.add_block(
                     parent_block_id = block.parent_block_id,
@@ -365,7 +354,6 @@ class Node:
                     self.utxo_set = utxo_set
                     self.transactions = transactions
                     self.own_utxo = own_utxo
-                    self.own_utxo_u = own_utxo_u
                     self.execute_block_utxo(block)
                 return True
             else:
@@ -396,12 +384,11 @@ class Node:
         utxo_set = copy.deepcopy(self.utxo_set)
         txn_set = copy.deepcopy(self.transactions)
         own_utxo = copy.deepcopy(self.own_utxo)
-        own_utxo_u = copy.deepcopy(self.own_utxo_u)
 
         block_oc = self.blockchain.current_block #original_block_chain
         length_oc = block_oc.block_position 
         while length_oc >= block.block_position: #Removed all the utxo until the length of chain became equal.
-            self.remove_block_utxo(block_oc,utxo_set,txn_set,own_utxo, own_utxo_u)
+            self.remove_block_utxo(block_oc,utxo_set,txn_set,own_utxo)
         
             block_oc = self.blockchain.blocks[block_oc.parent_block_id]
             length_oc = block_oc.block_position
@@ -409,7 +396,7 @@ class Node:
         block_nc = self.blockchain.blocks[block.parent_block_id] #new_block_chain
         block_to_be_added = []
         while block_oc.id != block_nc.id: #Remove utxo until fork point
-            self.remove_block_utxo(block_oc,utxo_set,txn_set,own_utxo, own_utxo_u)
+            self.remove_block_utxo(block_oc,utxo_set,txn_set,own_utxo)
             
             block_to_be_added.append(block_nc.id)
             block_oc = self.blockchain.blocks[block_oc.parent_block_id]
@@ -418,6 +405,6 @@ class Node:
 
         while block_to_be_added != []: #add utxo until chain is new chain is created
             block_add = self.blockchain.blocks[block_to_be_added.pop()]
-            self.execute_block_utxo(block_add,utxo_set,txn_set,own_utxo,own_utxo_u)
+            self.execute_block_utxo(block_add,utxo_set,txn_set,own_utxo)
         
         return utxo_set, txn_set, own_utxo
