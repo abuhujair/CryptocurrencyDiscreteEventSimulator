@@ -139,8 +139,6 @@ class EventHandler:
                     event_node=event.node,
                     block=new_block
                 ))
-            # for node in list(self.nodes.values()):
-            #     print(node.id,node.blockchain)
 
         elif event.type == 5:   # Receive block
             print(event)
@@ -171,7 +169,5 @@ class EventHandler:
                     event_node=event.node,
                     block=new_block
                 ))
-            # for node in list(self.nodes.values()):
-            #     print(node.blockchain)
 
 
