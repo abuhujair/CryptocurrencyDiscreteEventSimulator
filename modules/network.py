@@ -241,6 +241,8 @@ class Node:
 
         for utxo in transaction.input_utxos:
             del utxo_set[utxo.id]
+            if utxo.owner == self.id and utxo.id in own_utxo:
+                del own_utxo[utxo.id]
         
         for utxo in transaction.output_utxos:
             utxo_set[utxo.id] = utxo
@@ -258,11 +260,13 @@ class Node:
         
         for utxo in transaction.output_utxos:
             del utxo_set[utxo.id]
-            if utxo.owner == self.id:
+            if utxo.owner == self.id and utxo.id in own_utxo:
                 del own_utxo[utxo.id]
         
         for utxo in transaction.input_utxos:
             utxo_set[utxo.id] = utxo
+            if utxo.owner == self.id:
+                own_utxo[utxo.id] = utxo
 
     def verify_block(self, block:Block, utxo_set: Dict[str, Utxo] = None):
         """Verify if block can be added to the blockchain, for block received or created by it.
@@ -306,7 +310,8 @@ class Node:
             own_utxo = self.own_utxo
 
         for txn in block.transactions:
-            del transactions[txn.id]
+            if txn.id in transactions:
+                del transactions[txn.id]
             self.execute_transaction(txn,utxo_set,own_utxo)
         
         # Coin base transaction
@@ -334,7 +339,7 @@ class Node:
             transactions[transaction.id] = transaction
         #Coinbase Transaction
         del utxo_set[block.miner_utxo.id]
-        if block.miner_utxo.owner == self.id:
+        if block.miner_utxo.owner == self.id and block.miner_utxo.id in own_utxo:
             del own_utxo[block.miner_utxo.id]
 
     def receive_block(self, block:Block):
@@ -350,7 +355,7 @@ class Node:
                 self.blockchain.add_block(
                     parent_block_id = block.parent_block_id,
                     child_block = block)
-                if(block.block_position > latest_block_position): #If the chain is being switched, utxo_set need to be updated    
+                if(block.block_position == latest_block_position+1): #If the chain is being switched, utxo_set need to be updated    
                     self.utxo_set = utxo_set
                     self.transactions = transactions
                     self.own_utxo = own_utxo

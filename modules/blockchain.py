@@ -129,7 +129,7 @@ class Blockchain:
         
         self.blocks[child_block.id] = child_block
         if ( self.current_block.id == child_block.parent_block_id #A new block is added to existing chain
-            or child_block.block_position > self.current_block.block_position +1 ): #a new block is added to forked chain
+            or child_block.block_position == self.current_block.block_position +1 ): #a new block is added to forked chain
             self.current_block = child_block
         return True
     
