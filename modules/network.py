@@ -310,7 +310,8 @@ class Node:
             own_utxo = self.own_utxo
 
         for txn in block.transactions:
-            del transactions[txn.id]
+            if txn.id in transactions:
+                del transactions[txn.id]
             self.execute_transaction(txn,utxo_set,own_utxo)
         
         # Coin base transaction

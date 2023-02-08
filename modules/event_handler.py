@@ -106,6 +106,7 @@ class EventHandler:
                     )) 
 
         elif event.type == 3:   # Mining Start
+            print(event)
             new_block = event.node.create_block()
             self.add_event(Event(
                 event_time=round(event.time+self.gen_exp.exponential(self.iat_b/event.node.hash),4),

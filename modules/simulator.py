@@ -31,7 +31,7 @@ class Simulator:
         # Initialize first transaction events
         for node in self.nodes.values():
             new_event = Event(
-                event_time = float("{:.2f}".format(self.gen_exp.exponential(self.iat))),
+                event_time = round(self.gen_exp.exponential(self.iat),4),
                 event_type = 1, # Create transaction
                 event_node = node
             )
@@ -40,7 +40,7 @@ class Simulator:
         # Initialize first mining events
         for node in self.nodes.values():
             new_event = Event(
-                event_time = float("{:.2f}".format(self.gen_exp.exponential(self.iat*30))),
+                event_time = round(self.gen_exp.exponential(self.iat_block),4),
                 event_type = 3, # Create transaction
                 event_node = node
             )
