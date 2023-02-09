@@ -91,7 +91,7 @@ class Node:
         for utxo in list(self.own_utxo.values()):
             total_money += utxo.value
 
-        value = random.uniform(0.0001, total_money)
+        value = round(random.uniform(0.0001, total_money),4)
         new_transaction = Transaction(
             payer=self.id,
             payee=payee,
