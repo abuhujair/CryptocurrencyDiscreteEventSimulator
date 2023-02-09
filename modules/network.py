@@ -29,13 +29,8 @@ class Node:
         self.hash = hash
 
         self.blockchain = Blockchain(genesis_block)
-        self.utxo_set = utxo_set  # Dict[utxo_id, Utxo]
 
-        self.own_utxo = dict()  # Nodes own money
-        for utxo in list(utxo_set.values()):
-            if utxo.owner == self.id:
-                self.own_utxo[utxo.id] = utxo
-
+        self.pending_transactions = dict()  # [transaction_id, Transaction]
         self.transactions = dict()  # [transaction_id, Transaction]
         self.gen_exp = np.random.default_rng()
 
