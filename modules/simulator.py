@@ -64,7 +64,7 @@ class Simulator:
 
         # Generate genesis block transactions
         for i in range(self.num_nodes):
-            coins = round(random.uniform(50, 500),4)
+            coins = random.uniform(50, 500)
             new_transaction = Transaction(
                 payer=-1,
                 payee=i,
