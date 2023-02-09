@@ -59,7 +59,7 @@ class EventHandler:
         heapq.heappush(self.event_queue, event)
 
     def handle_event(self, event:Event):
-        # self.logger.info(event)
+        self.logger.info(event)
 
         if event.type == 1: # Create transaction
             while True:
@@ -106,7 +106,7 @@ class EventHandler:
                     )) 
 
         elif event.type == 3:   # Mining Start
-            print(event)
+            # print(event)
             new_block = event.node.create_block()
             self.add_event(Event(
                 event_time=round(event.time+self.gen_exp.exponential(self.iat_b/event.node.hash),4),
@@ -116,7 +116,7 @@ class EventHandler:
             ))
 
         elif event.type == 4:   # Mining end
-            print(event)
+            # print(event)
             latest_block_number = event.node.blockchain.current_block.block_position
             block = event.extra_parameters['block']
             if block.block_position == latest_block_number+1 and event.node.mine_block(block,event.time):
@@ -142,7 +142,7 @@ class EventHandler:
                 ))
 
         elif event.type == 5:   # Receive block
-            print(event)
+            # print(event)
             block = event.extra_parameters['block']
             event_creator_node = event.extra_parameters['event_creator']
             if event.node.receive_block(block):
@@ -153,7 +153,6 @@ class EventHandler:
 
                     message_length = (len(block.transactions) + 1)*0.008
                     latency = event.node.get_latency(self.nodes[peer_id], message_length)
-                    # self.logger.critical(f"{round(event.time + latency, 4)}\t\t{latency}\t\t{event.time}")
                     
                     self.add_event(Event(
                         event_time=round(event.time + latency, 4),
