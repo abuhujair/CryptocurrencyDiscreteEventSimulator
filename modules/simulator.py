@@ -6,7 +6,7 @@ import copy
 
 from modules.network import Node
 from modules.event_handler import Event, EventHandler
-from modules.blockchain import Block, Transaction, Utxo
+from modules.blockchain import Block, Transaction
 
 
 class Simulator:
@@ -40,7 +40,7 @@ class Simulator:
         # Initialize first mining events
         for node in self.nodes.values():
             new_event = Event(
-                event_time = round(self.gen_exp.exponential(self.iat_block),4),
+                event_time = round(self.gen_exp.exponential(self.iat_block)/2,4),
                 event_type = 3, # Create transaction
                 event_node = node
             )
@@ -59,35 +59,27 @@ class Simulator:
         Returns:
             dict: Dictionary [id: Node] of all the newly generated nodes
         """
-        utxo_set = dict()
         transactions = list()
-
+        account_balance = dict()
         # Generate genesis block transactions
         for i in range(self.num_nodes):
-            coins = random.uniform(50, 500)
+            coins = round(random.uniform(50, 500),4)
             new_transaction = Transaction(
                 payer=-1,
                 payee=i,
                 value=coins,
                 timestamp=0,
             )
-        
-            new_utxo = Utxo(
-                new_transaction.id,
-                owner=i,
-                value=coins
-            )
-            new_transaction.add_utxos(input_utxos=None, output_utxos=[new_utxo])
-
             transactions.append(new_transaction)
-            utxo_set[new_utxo.id] = new_utxo
+            account_balance[i] = coins
 
         genesis_block = Block(
             parent_block_id=None,
             block_position=0,
             timestamp=0,
             transactions=transactions,
-            block_creator=-1
+            block_creator=-1,
+            account_balance=account_balance
         )
 
         nodes = {}
@@ -99,15 +91,14 @@ class Simulator:
         for i in random_index[0:self.num_slow_nodes]:   # SLOW nodes
             nodes[i] = Node(node_id=i, 
                             node_type=0, 
-                            genesis_block=copy.deepcopy(genesis_block), 
-                            utxo_set=copy.deepcopy(utxo_set),hash = hash[i],
+                            genesis_block=copy.deepcopy(genesis_block),
+                            hash = hash[i],
                             MAX_BLOCK_LENGTH=self.MAX_BLOCK_LENGTH)
         
         for i in random_index[self.num_slow_nodes:self.num_nodes]:  # FAST nodes
             nodes[i] = Node(node_id=i, 
                             node_type=1, 
                             genesis_block=copy.deepcopy(genesis_block), 
-                            utxo_set=copy.deepcopy(utxo_set),
                             hash = hash[i],
                             MAX_BLOCK_LENGTH=self.MAX_BLOCK_LENGTH)
         return nodes

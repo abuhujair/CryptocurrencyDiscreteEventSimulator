@@ -23,13 +23,13 @@ class Transaction:
         self.timestamp = timestamp
 
     def __str__(self) -> str:
-        output = f"\tTRANSACTION {self.id}\n\tPayer : {self.payer}\n\tPayee : {self.payee}\n\tValue : {self.value}\n\tTimestamp : {self.timestamp}\n"
+        output = f"\tTRANSACTION {self.id}Payer : {self.payer} Payee : {self.payee} Value : {self.value} Timestamp : {self.timestamp}\n"
         return output
 
 class Block:
     """Transaction block instance
     """
-    def __init__(self, parent_block_id:str, block_position:int, timestamp:float, transactions:List[Transaction], block_creator:int) -> None:
+    def __init__(self, parent_block_id:str, block_position:int, timestamp:float, transactions:List[Transaction], block_creator:int, account_balance:Dict[int,float]) -> None:
         """Creates a block of the blockchain with the transactions
 
         Args:
@@ -50,16 +50,17 @@ class Block:
         self.parent_block_id = parent_block_id
         self.block_position = block_position
         self.coinbase_transaction = Transaction(payer=-1,payee=block_creator,value=50,timestamp=timestamp)
+        self.account_balance = account_balance #Dict [int, float]
 
     def __str__(self) -> str:
         if self.parent_block_id is None:
-            output = f"BLOCK {self.id}\nParent block id : None\nTimestamp : {self.timestamp}\nBlock position : {self.block_position}\n"
+            output = f"GENESIS BLOCK {self.id} Parent block id : None Timestamp : {self.timestamp} Block position : {self.block_position}\n"
         else:
-            output = f"BLOCK {self.id}\nParent block id : {self.parent_block_id}\nTimestamp : {self.timestamp}\nBlock position : {self.block_position}\n"
-        output += "Transactions\n"
+            output = f"BLOCK {self.id} Parent block id : {self.parent_block_id} Timestamp : {self.timestamp} Block position : {self.block_position}\n"
+        output += f"\tTransactions:\n"
         for txn in self.transactions:
-            output += f"\t{txn}\n"
-        output += f"Coinbase Transaction : {self.coinbase_transaction}\n"
+            output += f"\t{txn}"
+        output += f"\tCoinbase Transaction:\n \t{self.coinbase_transaction}"
         return output
 
 class Blockchain:
@@ -75,6 +76,7 @@ class Blockchain:
         self.current_block = genesis_block
         self.blocks = dict()    # Dict[str, Block]
         self.blocks[genesis_block.id] = genesis_block
+        self.cached_blocks = dict() #Dict[parent_block_id, Block]
 
     def add_block(self, child_block:Block):
         """Add new block to the blockchain
@@ -84,36 +86,33 @@ class Blockchain:
             child_block (Block): New block to be added
 
         Returns:
-            bool: True if block added successfully, else False
+            bool: True if block added to the main chain, else False
         """
         self.blocks[child_block.id] = child_block
         if ( self.current_block.id == child_block.parent_block_id #A new block is added to existing chain
             or child_block.block_position == self.current_block.block_position +1 ): #a new block is added to forked chain
             self.current_block = child_block
-        if child_block.parent_block_id not in list(self.blocks.keys()): # Parent block does not exist
-            return False
-        return True
     
-    def __str__(self) -> str:
-        nodes = {}
-        id_mapping = {}
-        counter  = 0
-        for node in list(self.blocks.values()):
-            id_mapping[node.id] = counter
-            counter += 1
+    # def __str__(self) -> str:
+    #     nodes = {}
+    #     id_mapping = {}
+    #     counter  = 0
+    #     for node in list(self.blocks.values()):
+    #         id_mapping[node.id] = counter
+    #         counter += 1
 
-        for node in list(self.blocks.values()):
-            try:
-                if id_mapping[node.parent_block_id] in nodes.keys():
-                    nodes[id_mapping[node.parent_block_id]].append(("BlockID:"+node.parent_block_id,"NodePosition:"+str(node.block_position),
-                        "NumberTXNs:"+str(len(node.transactions)),"ChildBlockID"+node.id,"ChildBlockNode"+str(id_mapping[node.id])))
-                else:
-                    nodes[id_mapping[node.parent_block_id]] = [("BlockID:"+node.parent_block_id,"NodePosition:"+str(node.block_position),
-                        "NumberTXNs:"+str(len(node.transactions)),"ChildBlockID"+node.id,"ChildBlockNode"+str(id_mapping[node.id]))]
-            except:
-                pass
+    #     for node in list(self.blocks.values()):
+    #         try:
+    #             if id_mapping[node.parent_block_id] in nodes.keys():
+    #                 nodes[id_mapping[node.parent_block_id]].append(("BlockID:"+node.parent_block_id,"NodePosition:"+str(node.block_position),
+    #                     "NumberTXNs:"+str(len(node.transactions)),"ChildBlockID"+node.id,"ChildBlockNode"+str(id_mapping[node.id])))
+    #             else:
+    #                 nodes[id_mapping[node.parent_block_id]] = [("BlockID:"+node.parent_block_id,"NodePosition:"+str(node.block_position),
+    #                     "NumberTXNs:"+str(len(node.transactions)),"ChildBlockID"+node.id,"ChildBlockNode"+str(id_mapping[node.id]))]
+    #         except:
+    #             pass
 
-        return f"{nodes}"
+    #     return f"{nodes}"
 
     # def __str__(self) -> str:
     #     blockchain_graph_nodes = []
@@ -134,9 +133,9 @@ class Blockchain:
     #     plt.savefig("test.png")
     #     return "Printed"
     
-    # def __str__(self) -> str:
-    #     output = f"Blockchain\n"
-    #     for block in list(self.blocks.values()):
-    #         output += f"{block}\n"
+    def __str__(self) -> str:
+        output = f"Blockchain\n"
+        for block in list(self.blocks.values()):
+            output += f"\t{block}\n"
     
-    #     return output
+        return output
