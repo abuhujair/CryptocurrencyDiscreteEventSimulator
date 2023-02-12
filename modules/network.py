@@ -84,6 +84,7 @@ class Node:
             Transaction: Transaction object
         """
         total_money = self.blockchain.current_block.account_balance[self.id]
+
         value = round(random.uniform(0.0001, total_money),4)
         new_transaction = Transaction(
             payer=self.id,
@@ -176,7 +177,8 @@ class Node:
         sum_outgoing = [0]*len(current_account_balance)
         txns = dict() #Dict[str,Transaction]
         for transaction in block.transactions:
-            if transaction not in txns and transaction.id in pending_transactions:
+            if transaction not in txns and (transaction.id in pending_transactions 
+                or transaction.id not in self.transactions):
                 txns[transaction.id] = transaction
                 sum_outgoing[transaction.payer] -= transaction.value
                 sum_outgoing[transaction.payee] += transaction.value
@@ -204,7 +206,10 @@ class Node:
             current_block = self.blockchain.current_block
 
         for txn in block.transactions:
-            del pending_transactions[txn.id]
+            if txn.id in pending_transactions:
+                del pending_transactions[txn.id]
+            else:
+                self.transactions[txn.id] = txn
 
         if block.coinbase_transaction.id not in self.transactions:
             self.transactions[block.coinbase_transaction.id] = copy.deepcopy(block.coinbase_transaction)
