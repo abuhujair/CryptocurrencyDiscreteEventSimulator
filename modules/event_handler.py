@@ -15,7 +15,7 @@ class Event:
 
         Args:
             event_time (float): simulation time
-            event_type (int): 0: Not defined, 1: create txn, 2: recieve txn, 3: start_mining (to be called only once), 4: end_mining, 5: receive_block
+            event_type (int): 0: Not defined, 1: create t3xn, 2: recieve txn, 3: start_mining (to be called only once), 4: end_mining, 5: receive_block
             event_node (Node): Node object that creates the event
         """
         self.time = event_time
@@ -59,7 +59,7 @@ class EventHandler:
         heapq.heappush(self.event_queue, event)
 
     def handle_event(self, event:Event):
-        self.logger.info(event)
+        # self.logger.info(event)
 
         if event.type == 1: # Create transaction
             while True:
@@ -115,6 +115,7 @@ class EventHandler:
             ))
 
         elif event.type == 4:   # Mining end
+            self.logger.info(event)
             latest_block_number = event.node.blockchain.current_block.block_position
             block = event.extra_parameters['block']
             if block.block_position == latest_block_number+1 and event.node.mine_block(block,event.time):
@@ -140,6 +141,7 @@ class EventHandler:
                 ))
 
         elif event.type == 5:   # Receive block
+            self.logger.info(event)
             block = event.extra_parameters['block']
             event_creator_node = event.extra_parameters['event_creator']
             if event.node.receive_block(block):
@@ -166,5 +168,3 @@ class EventHandler:
                     event_node=event.node,
                     block=new_block
                 ))
-
-

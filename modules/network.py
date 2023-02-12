@@ -85,7 +85,7 @@ class Node:
         """
         total_money = self.blockchain.current_block.account_balance[self.id]
 
-        value = round(random.uniform(0.0001, total_money),4)
+        value = random.uniform(0.0001, total_money)
         new_transaction = Transaction(
             payer=self.id,
             payee=payee,
@@ -146,7 +146,8 @@ class Node:
                 counter += 1
             if counter == self.MAX_BLOCK_LENGTH-1:
                 break
-        
+
+        account_balance[self.id] +=50
         block = Block(
             parent_block_id=self.blockchain.current_block.id,
             block_position=self.blockchain.current_block.block_position + 1,
@@ -189,7 +190,7 @@ class Node:
 
         for node in range(len(current_account_balance)):
             if (current_account_balance[node]+sum_outgoing[node] < 0  
-            or current_account_balance[node]+sum_outgoing[node] != block.account_balance[node]):
+                or round(current_account_balance[node]+sum_outgoing[node], 5) != round(block.account_balance[node],5)):
                 return False
         return True
     
@@ -202,8 +203,8 @@ class Node:
         """
         if pending_transactions == None: #if primary chain is being verified
             pending_transactions = self.pending_transactions
-        if current_block == None: #if primary chain is being verified
-            current_block = self.blockchain.current_block
+        # if current_block == None: #if primary chain is being verified
+        #     current_block = self.blockchain.current_block
 
         for txn in block.transactions:
             if txn.id in pending_transactions:
@@ -224,8 +225,8 @@ class Node:
         """
         if pending_transactions == None: #if primary chain is being verified
             pending_transactions = self.pending_transactions
-        if current_block == None: #if primary chain is being verified
-            current_block = self.blockchain.current_block
+        # if current_block == None: #if primary chain is being verified
+        #     current_block = self.blockchain.current_block
 
         for txn in block.transactions:
             pending_transactions[txn.id] = txn
@@ -241,9 +242,9 @@ class Node:
         """
         if block.id in self.blockchain.blocks.keys():
             return False
-        if block.parent_block_id not in self.blockchain.blocks.keys() and block not in self.blockchain.cached_blocks:
-            self.blockchain.cached_blocks[block.parent_block_id] = block
-            return True
+        # if block.parent_block_id not in self.blockchain.blocks.keys() and block not in self.blockchain.cached_blocks:
+        #     self.blockchain.cached_blocks[block.parent_block_id] = block
+        #     return True
         
         latest_block_position = self.blockchain.current_block.block_position
         if block.parent_block_id != self.blockchain.current_block.id: # This will lead to fork, or extension of forked chain.
@@ -264,9 +265,9 @@ class Node:
             else:
                 return False
 
-        if block.id in self.blockchain.cached_blocks:
-            self.receive_block(self.blockchain.cached_blocks[block.id])
-            del self.blockchain.cached_blocks[block.id]
+        # if block.id in self.blockchain.cached_blocks:
+        #     self.receive_block(self.blockchain.cached_blocks[block.id])
+        #     del self.blockchain.cached_blocks[block.id]
         return True
 
     def create_new_pool(self, block:Block):
