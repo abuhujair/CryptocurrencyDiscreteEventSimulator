@@ -64,7 +64,7 @@ class Simulator:
         account_balance = dict()
         # Generate genesis block transactions
         for i in range(self.num_nodes):
-            coins = round(random.uniform(50, 500),4)
+            coins = random.uniform(50, 500)
             new_transaction = Transaction(
                 payer=-1,
                 payee=i,
@@ -175,6 +175,4 @@ class Simulator:
         while current_time < simulation_time and self.event_queue != []:
             event = heapq.heappop(self.event_queue)
             current_time = event.time
-            self.event_handler.handle_event(event) 
-
-        
+            self.event_handler.handle_event(event)
