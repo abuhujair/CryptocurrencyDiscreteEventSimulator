@@ -92,26 +92,26 @@ class Blockchain:
             or child_block.block_position == self.current_block.block_position +1 ): #a new block is added to forked chain
             self.current_block = child_block
     
-    # def __str__(self) -> str:
-    #     nodes = {}
-    #     id_mapping = {}
-    #     counter  = 0
-    #     for node in list(self.blocks.values()):
-    #         id_mapping[node.id] = counter
-    #         counter += 1
+    def __str__(self) -> str:
+        nodes = {}
+        id_mapping = {}
+        counter  = 0
+        for node in list(self.blocks.values()):
+            id_mapping[node.id] = counter
+            counter += 1
 
-    #     for node in list(self.blocks.values()):
-    #         try:
-    #             if id_mapping[node.parent_block_id] in nodes.keys():
-    #                 nodes[id_mapping[node.parent_block_id]].append(("BlockID:"+node.parent_block_id,"NodePosition:"+str(node.block_position),
-    #                     "NumberTXNs:"+str(len(node.transactions)),"ChildBlockID"+node.id,"ChildBlockNode"+str(id_mapping[node.id])))
-    #             else:
-    #                 nodes[id_mapping[node.parent_block_id]] = [("BlockID:"+node.parent_block_id,"NodePosition:"+str(node.block_position),
-    #                     "NumberTXNs:"+str(len(node.transactions)),"ChildBlockID"+node.id,"ChildBlockNode"+str(id_mapping[node.id]))]
-    #         except:
-    #             pass
+        for node in list(self.blocks.values()):
+            try:
+                if id_mapping[node.parent_block_id] in nodes.keys():
+                    nodes[id_mapping[node.parent_block_id]].append(("BlockID:"+node.parent_block_id,"NodePosition:"+str(node.block_position),
+                        "NumberTXNs:"+str(len(node.transactions)),"ChildBlockID"+node.id,"ChildBlockNode"+str(id_mapping[node.id])))
+                else:
+                    nodes[id_mapping[node.parent_block_id]] = [("BlockID:"+node.parent_block_id,"NodePosition:"+str(node.block_position),
+                        "NumberTXNs:"+str(len(node.transactions)),"ChildBlockID"+node.id,"ChildBlockNode"+str(id_mapping[node.id]))]
+            except:
+                pass
 
-    #     return f"{nodes}"
+        return f"{nodes}"
 
     # def __str__(self) -> str:
     #     blockchain_graph_nodes = []
@@ -132,9 +132,9 @@ class Blockchain:
     #     plt.savefig("test.png")
     #     return "Printed"
     
-    def __str__(self) -> str:
-        output = f"Blockchain\n"
-        for block in list(self.blocks.values()):
-            output += f"\t{block}\n"
+    # def __str__(self) -> str:
+    #     output = f"Blockchain\n"
+    #     for block in list(self.blocks.values()):
+    #         output += f"\t{block}\n"
     
-        return output
+    #     return output

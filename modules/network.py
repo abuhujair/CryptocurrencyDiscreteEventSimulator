@@ -242,10 +242,14 @@ class Node:
         """
         if block.id in self.blockchain.blocks.keys():
             return False
-        # if block.parent_block_id not in self.blockchain.blocks.keys() and block not in self.blockchain.cached_blocks:
-        #     self.blockchain.cached_blocks[block.parent_block_id] = block
-        #     return True
+
+        if block.parent_block_id not in self.blockchain.blocks.keys() and block.parent_block_id not in self.blockchain.cached_blocks:
+            self.blockchain.cached_blocks[block.parent_block_id] = block
+            return False
         
+        if block.parent_block_id in self.blockchain.cached_blocks:
+            del self.blockchain.cached_blocks[block.parent_block_id]
+
         latest_block_position = self.blockchain.current_block.block_position
         if block.parent_block_id != self.blockchain.current_block.id: # This will lead to fork, or extension of forked chain.
             #Since checkpointing is not implemented, fork and fork extension will be possible at any blocklength.
@@ -265,9 +269,6 @@ class Node:
             else:
                 return False
 
-        # if block.id in self.blockchain.cached_blocks:
-        #     self.receive_block(self.blockchain.cached_blocks[block.id])
-        #     del self.blockchain.cached_blocks[block.id]
         return True
 
     def create_new_pool(self, block:Block):

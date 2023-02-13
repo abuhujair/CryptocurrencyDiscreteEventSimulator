@@ -144,6 +144,7 @@ class EventHandler:
             self.logger.info(event)
             block = event.extra_parameters['block']
             event_creator_node = event.extra_parameters['event_creator']
+            
             if event.node.receive_block(block):
                 # Propagate the block
                 for peer_id in event.node.peers:
