@@ -3,6 +3,9 @@ import numpy as np
 import heapq
 from typing import List
 import copy
+import graphviz as graph
+import networkx as nx
+import matplotlib.pyplot as plt
 
 from modules.network import Node
 from modules.event_handler import Event, EventHandler
@@ -134,6 +137,31 @@ class Simulator:
                         node.add_peer(rand_peer.id, propagation_delay)
                         rand_peer.add_peer(node.id, propagation_delay)
             
+            network_graph_nodes = []
+            network_graph_edges = []
+            for node in list(self.nodes.values()):
+                network_graph_nodes.append(node.id)
+                for i in node.peers:
+                    network_graph_edges.append((i, node.id))
+            
+            G = nx.DiGraph()
+            G.add_nodes_from(network_graph_nodes)
+            G.add_edges_from(network_graph_edges)
+            pos = nx.spring_layout(G)
+            nx.draw(G, pos, with_labels=True)
+            plt.show()
+
+
+            # G = graph.Digraph('parent', engine='neato')
+            # G.edge_attr.update(arrowsize='2')
+            # G.attr(rankdir='LR',splines='line')
+            # for i in network_graph_nodes:
+            #     G.node(str(i))
+            # for i in network_graph_edges:
+            #     G.edge(str(list(i)[0]),str(list(i)[1]))   
+            # G = G.unflatten(stagger=3)
+            # G.view()
+
             if self.check_connectivity():
                 break
             
