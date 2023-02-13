@@ -58,7 +58,7 @@ class EventHandler:
         """
         heapq.heappush(self.event_queue, event)
 
-    def handle_event(self, event:Event):
+    def handle_event(self,  event:Event):
         # self.logger.info(event)
 
         if event.type == 1: # Create transaction
