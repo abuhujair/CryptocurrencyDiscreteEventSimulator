@@ -143,14 +143,16 @@ class Blockchain:
         # # Draw the graph using a spring layout
         # pos = nx.nx_agraph.graphviz_layout(G, prog='neato')
         # nx.draw(G, pos, with_labels=False)
+        nodes = {}
+        for i in range(len(blockchain_graph_nodes)):
+            nodes[blockchain_graph_nodes[i]]=i
 
         G = graph.Digraph('parent', engine='neato')
         G.attr(rankdir='LR',splines='line')
         for i in blockchain_graph_nodes:
-            G.node(i)
+            G.node(str(nodes[i]))
         for i in blockchain_graph_edges:
-            G.edge(list(i)[0],list(i)[1])   
-        G = G.unflatten(stagger=3)
+            G.edge(str(nodes[list(i)[0]]),str(nodes[list(i)[1]]))   
         G.view()
         # plt.show()
         return "Printed"
