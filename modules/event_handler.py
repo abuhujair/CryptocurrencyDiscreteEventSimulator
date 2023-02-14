@@ -59,7 +59,7 @@ class EventHandler:
         heapq.heappush(self.event_queue, event)
 
     def handle_event(self,  event:Event):
-        # self.logger.info(event)
+        self.logger.info(event)
 
         if event.type == 1: # Create transaction
             while True:
@@ -115,7 +115,6 @@ class EventHandler:
             ))
 
         elif event.type == 4:   # Mining end
-            self.logger.info(event)
             latest_block_number = event.node.blockchain.current_block.block_position
             block = event.extra_parameters['block']
             if block.block_position == latest_block_number+1 and event.node.mine_block(block,event.time):
@@ -141,11 +140,10 @@ class EventHandler:
                 ))
 
         elif event.type == 5:   # Receive block
-            self.logger.info(event)
             block = event.extra_parameters['block']
             event_creator_node = event.extra_parameters['event_creator']
             
-            if event.node.receive_block(block):
+            while event.node.receive_block(block):
                 # Propagate the block
                 for peer_id in event.node.peers:
                     if peer_id == event_creator_node:   # Circular dependency
@@ -162,10 +160,14 @@ class EventHandler:
                         event_creator = event.node
                     )) 
 
-                new_block = event.node.create_block()
-                self.add_event(Event(
-                    event_time=round(event.time+self.gen_exp.exponential(self.iat_b/event.node.hash),4),
-                    event_type=4,
-                    event_node=event.node,
-                    block=new_block
-                ))
+                if block.id in event.node.blockchain.cached_blocks:
+                    block = event.node.blockchain.cached_blocks[block.id]
+                else:
+                    new_block = event.node.create_block()
+                    self.add_event(Event(
+                        event_time=round(event.time+self.gen_exp.exponential(self.iat_b/event.node.hash),4),
+                        event_type=4,
+                        event_node=event.node,
+                        block=new_block
+                    ))
+                    break

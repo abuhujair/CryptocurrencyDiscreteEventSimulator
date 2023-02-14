@@ -61,6 +61,7 @@ class Block:
         for txn in self.transactions:
             output += f"\t{txn}"
         output += f"\tCoinbase Transaction:\n \t{self.coinbase_transaction}"
+        output += f"\tSum of Account Balance: {sum(self.account_balance.values())}"
         return output
 
 class Blockchain:
@@ -127,35 +128,38 @@ class Blockchain:
 
     #     return f"{nodes}"
     def __str__(self) -> str:
-        blockchain_graph_nodes = []
-        blockchain_graph_edges = []
-        for node in list(self.blocks.values()):
-            blockchain_graph_nodes.append(node.id)
-            if node.parent_block_id == None:    # Genesis block
-                continue
-            blockchain_graph_edges.append((node.id, node.parent_block_id))
-        # print(blockchain_graph_nodes)
-        # print(blockchain_graph_edges)
-        # G = nx.DiGraph()
-        # G.add_nodes_from(blockchain_graph_nodes)
-        # G.add_edges_from(blockchain_graph_edges)
+        # blockchain_graph_nodes = []
+        # blockchain_graph_edges = []
+        # for node in list(self.blocks.values()):
+        #     blockchain_graph_nodes.append(node.id)
+        #     if node.parent_block_id == None:    # Genesis block
+        #         continue
+        #     blockchain_graph_edges.append((node.id, node.parent_block_id))
+        # # print(blockchain_graph_nodes)
+        # # print(blockchain_graph_edges)
+        # # G = nx.DiGraph()
+        # # G.add_nodes_from(blockchain_graph_nodes)
+        # # G.add_edges_from(blockchain_graph_edges)
 
-        # # Draw the graph using a spring layout
-        # pos = nx.nx_agraph.graphviz_layout(G, prog='neato')
-        # nx.draw(G, pos, with_labels=False)
-        nodes = {}
-        for i in range(len(blockchain_graph_nodes)):
-            nodes[blockchain_graph_nodes[i]]=i
+        # # # Draw the graph using a spring layout
+        # # pos = nx.nx_agraph.graphviz_layout(G, prog='neato')
+        # # nx.draw(G, pos, with_labels=False)
+        # nodes = {}
+        # for i in range(len(blockchain_graph_nodes)):
+        #     nodes[blockchain_graph_nodes[i]]=i
 
-        G = graph.Digraph('parent', engine='neato')
-        G.attr(rankdir='LR',splines='line')
-        for i in blockchain_graph_nodes:
-            G.node(str(nodes[i]))
-        for i in blockchain_graph_edges:
-            G.edge(str(nodes[list(i)[0]]),str(nodes[list(i)[1]]))   
-        G.view()
-        # plt.show()
-        return "Printed"
+        # G = graph.Digraph('parent')
+        # G.attr(rankdir='LR',splines='line')
+        # for i in blockchain_graph_nodes:
+        #     G.node(str(nodes[i]))
+        # for i in blockchain_graph_edges:
+        #     G.edge(str(nodes[list(i)[0]]),str(nodes[list(i)[1]]))   
+        # G.view()
+        # # plt.show()
+        output = f"Blockchain\n"
+        for block in list(self.blocks.values()):
+            output += f"\t{block}\n"
+        return output
     
     # def __str__(self) -> str:
     #     output = f"Blockchain\n"
