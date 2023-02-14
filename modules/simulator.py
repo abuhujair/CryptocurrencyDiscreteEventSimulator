@@ -90,25 +90,25 @@ class Simulator:
 
         hash_power = 1/(10*self.num_nodes - 9*self.num_low_hash)
 
-        slow_nodes = random.sample(range(self.num_nodes), self.num_slow_nodes)
-        low_hash_p = random.sample(range(self.num_nodes), self.num_low_hash)
+        self.slow_nodes = random.sample(range(self.num_nodes), self.num_slow_nodes)
+        self.low_hash_p = random.sample(range(self.num_nodes), self.num_low_hash)
 
         for i in range(self.num_nodes):
-            if (i in slow_nodes) and (i in low_hash_p):
+            if (i in self.slow_nodes) and (i in self.low_hash_p):
                 nodes[i] = Node(node_id=i,
                                 node_type=0,
                                 genesis_block=copy.deepcopy(genesis_block),
                                 hash=hash_power,
                                 MAX_BLOCK_LENGTH=self.MAX_BLOCK_LENGTH)
             
-            elif i in slow_nodes:
+            elif i in self.slow_nodes:
                 nodes[i] = Node(node_id=i,
                                 node_type=0,
                                 genesis_block=copy.deepcopy(genesis_block),
                                 hash=hash_power*10,
                                 MAX_BLOCK_LENGTH=self.MAX_BLOCK_LENGTH)
 
-            elif i in low_hash_p:
+            elif i in self.low_hash_p:
                 nodes[i] = Node(node_id=i,
                                 node_type=1,
                                 genesis_block=copy.deepcopy(genesis_block),
@@ -139,27 +139,42 @@ class Simulator:
             
             network_graph_nodes = []
             network_graph_edges = []
+            colormap_nodes = []
+            colormap_edges = []
             for node in list(self.nodes.values()):
                 network_graph_nodes.append(node.id)
                 for i in node.peers:
                     network_graph_edges.append((i, node.id))
+                    if node.id in self.slow_nodes or i in self.slow_nodes:
+                        colormap_edges.append('#53565A')                    #Slow conection
+                    else:
+                        colormap_edges.append('#A1000E')                    #Fast Connection 
             
             G = nx.DiGraph()
             G.add_nodes_from(network_graph_nodes)
             G.add_edges_from(network_graph_edges)
+
+            for i in network_graph_nodes:
+                if(i in self.low_hash_p):
+                    colormap_nodes.append('#00AEEF')
+                else:
+                    colormap_nodes.append('#26D07C')
+
+            # for i in network_graph_edges:
+            #     G.add_edge(str(list(i)[0]),str(list(i)[1]))   
             pos = nx.spring_layout(G)
-            nx.draw(G, pos, with_labels=True)
+            nx.draw(G, pos, node_color=colormap_nodes, edge_color=colormap_edges, with_labels=True)
+            plt.legend(["NODES: Blue:- Low Hash Power & Green:- High Hash Power", "EDGE: Red:- Fast connection & Gray:- Slow Connection"], loc='best')
             plt.show()
 
 
             # G = graph.Digraph('parent', engine='neato')
-            # G.edge_attr.update(arrowsize='2')
-            # G.attr(rankdir='LR',splines='line')
+            # # G.edge_attr.update(arrowsize='2')
+            # # G.attr(rankdir='LR',splines='line')
             # for i in network_graph_nodes:
             #     G.node(str(i))
             # for i in network_graph_edges:
             #     G.edge(str(list(i)[0]),str(list(i)[1]))   
-            # G = G.unflatten(stagger=3)
             # G.view()
 
             if self.check_connectivity():
@@ -196,6 +211,43 @@ class Simulator:
         print("The Network is not connected.")
         return False
 
+    def visualizer(self):
+        blockchain_graph_nodes = []
+        blockchain_graph_edges = []
+        for user in self.nodes.values(): 
+            for node in list(user.blockchain.blocks.values()):
+                blockchain_graph_nodes.append(node.id)
+                if node.parent_block_id == None:    # Genesis block
+                    continue
+                blockchain_graph_edges.append((node.id, node.parent_block_id))
+            nodes = {}
+            for i in range(len(blockchain_graph_nodes)):
+                nodes[blockchain_graph_nodes[i]]=i
+            G = graph.Digraph(f"{user.id}")
+            G.attr(rankdir='LR',splines='line')
+            for i in blockchain_graph_nodes:
+                G.node(str(nodes[i]))
+            for i in blockchain_graph_edges:
+                G.edge(str(nodes[list(i)[0]]),str(nodes[list(i)[1]]))   
+            # G.view()
+            G.render(f"results/{user.id}")
+            G.clear()
+            blockchain_graph_edges.clear()
+            blockchain_graph_nodes.clear()
+            # del(G)
+            # del(blockchain_graph_edges)
+            # del(blockchain_graph_edges)
+        # print(blockchain_graph_nodes)
+        # print(blockchain_graph_edges)
+        # G = nx.DiGraph()
+        # G.add_nodes_from(blockchain_graph_nodes)
+        # G.add_edges_from(blockchain_graph_edges)
+
+        # # Draw the graph using a spring layout
+        # pos = nx.nx_agraph.graphviz_layout(G, prog='neato')
+        # nx.draw(G, pos, with_labels=False)
+        
+        # plt.show()
     # ==========================================================================================
     # Simulator functions
     def run_simulation(self, simulation_time:float):
@@ -204,3 +256,4 @@ class Simulator:
             event = heapq.heappop(self.event_queue)
             current_time = event.time
             self.event_handler.handle_event(event)
+        self.visualizer()
