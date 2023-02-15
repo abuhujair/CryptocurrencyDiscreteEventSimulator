@@ -4,19 +4,21 @@ from typing import Dict
 import numpy as np
 import copy
 
+import settings
 from modules.blockchain import Blockchain, Block, Transaction
 
 class Node:
-    """Node object for the blockchain
+    """Peer node of the network
     """
     def __init__(self, node_id: int, node_type: int, genesis_block:Block, hash:float, MAX_BLOCK_LENGTH:int):
-        """Node object
+        """Initialize peer node with miner properties.
 
         Args:
             node_id (int): Unique id for the node
             node_type (int): 0 - Slow, 1 - Fast 
             genesis_block (Block): Genesis block of the blockchain
-            utxo_set (Dict[str, Utxo]): Utxo set of the miner
+            hash (float): Hashing power
+            MAX_BLOCK_LENGTH (int): Maximum number of transactions in a block
         """
         self.id = node_id
         self.type = node_type
@@ -38,7 +40,7 @@ class Node:
     # ========================================================================================
     # Peer functions
     def add_peer(self, node_id: int, propagation_delay:float):
-        """Add new peer to the node
+        """Add new peer to current peer
 
         Args:
             node_id (int): Unique id of the node
@@ -185,6 +187,7 @@ class Node:
                 sum_outgoing[transaction.payee] += transaction.value
             else:
                 return False
+        
         #Coinbase Transaction
         sum_outgoing[block.coinbase_transaction.payee] += block.coinbase_transaction.value
 

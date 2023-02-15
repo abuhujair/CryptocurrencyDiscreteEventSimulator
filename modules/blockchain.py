@@ -39,6 +39,7 @@ class Block:
             timestamp (float): Simulation timestamp
             transactions (List[Transaction]): List of transactions contained in the block
             block_creator (int): Unique id of the creator of the block
+            account_balance (Dict[int, float]): Account balance of all the peers
         """
         transaction_str = ""
         for transaction in transactions:
@@ -52,6 +53,7 @@ class Block:
         self.block_position = block_position
         self.coinbase_transaction = Transaction(payer=-1,payee=block_creator,value=50,timestamp=timestamp)
         self.account_balance = account_balance #Dict [int, float]
+        
     def __str__(self) -> str:
         if self.parent_block_id is None:
             output = f"GENESIS BLOCK {self.id} Parent block id : None Timestamp : {self.timestamp} Block position : {self.block_position}\n"
