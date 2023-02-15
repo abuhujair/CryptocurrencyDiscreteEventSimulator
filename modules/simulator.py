@@ -28,6 +28,9 @@ class Simulator:
         # Create peer network
         self.nodes = self.create_nodes()    # Dictionary [id: Node]
         self.create_network()
+
+
+        self.networkVisualizer()
         
         self.event_queue = list()
         self.event_handler = EventHandler(self.event_queue, self.nodes, self.iat, self.iat_block)
@@ -137,47 +140,6 @@ class Simulator:
                         node.add_peer(rand_peer.id, propagation_delay)
                         rand_peer.add_peer(node.id, propagation_delay)
             
-            network_graph_nodes = []
-            network_graph_edges = []
-            colormap_nodes = []
-            colormap_edges = []
-            for node in list(self.nodes.values()):
-                network_graph_nodes.append(node.id)
-                for i in node.peers:
-                    network_graph_edges.append((i, node.id))
-                    if node.id in self.slow_nodes or i in self.slow_nodes:
-                        colormap_edges.append('#53565A')                    #Slow conection
-                    else:
-                        colormap_edges.append('#A1000E')                    #Fast Connection 
-            
-            G = nx.DiGraph()
-            G.add_nodes_from(network_graph_nodes)
-            G.add_edges_from(network_graph_edges)
-
-            for i in network_graph_nodes:
-                if(i in self.low_hash_p):
-                    colormap_nodes.append('#00AEEF')
-                else:
-                    colormap_nodes.append('#26D07C')
-
-            # for i in network_graph_edges:
-            #     G.add_edge(str(list(i)[0]),str(list(i)[1]))   
-            pos = nx.spring_layout(G)
-            nx.draw(G, pos, node_color=colormap_nodes, edge_color=colormap_edges, with_labels=True)
-            plt.legend(["NODES: Blue:- Low Hash Power & Green:- High Hash Power", "EDGE: Red:- Fast connection & Gray:- Slow Connection"], loc='best')
-            # plt.show()
-            plt.savefig(f"results/Node_Network.png")
-
-
-            # G = graph.Digraph('parent', engine='neato')
-            # # G.edge_attr.update(arrowsize='2')
-            # # G.attr(rankdir='LR',splines='line')
-            # for i in network_graph_nodes:
-            #     G.node(str(i))
-            # for i in network_graph_edges:
-            #     G.edge(str(list(i)[0]),str(list(i)[1]))   
-            # G.view()
-
             if self.check_connectivity():
                 break
             
@@ -211,6 +173,38 @@ class Simulator:
 
         print("The Network is not connected.")
         return False
+    
+    # ==========================================================================================
+    # Report and Visualization Functions
+
+    def networkVisualizer(self):
+        network_graph_nodes = []
+        network_graph_edges = []
+        colormap_nodes = []
+        colormap_edges = []
+        for node in list(self.nodes.values()):
+            network_graph_nodes.append(node.id)
+            for i in node.peers:
+                network_graph_edges.append((i, node.id))
+                if node.id in self.slow_nodes or i in self.slow_nodes:
+                    colormap_edges.append('#53565A')                    #Slow conection
+                else:
+                    colormap_edges.append('#A1000E')                    #Fast Connection 
+        
+        G = nx.DiGraph()
+        G.add_nodes_from(network_graph_nodes)
+        G.add_edges_from(network_graph_edges)
+
+        for i in network_graph_nodes:
+            if(i in self.low_hash_p):
+                colormap_nodes.append('#00AEEF')
+            else:
+                colormap_nodes.append('#26D07C')
+
+        pos = nx.spring_layout(G)
+        nx.draw(G, pos, node_color=colormap_nodes, edge_color=colormap_edges, with_labels=True)
+        plt.legend(["NODES: Blue:- Low Hash Power & Green:- High Hash Power", "EDGE: Red:- Fast connection & Gray:- Slow Connection"], loc='best')
+        plt.show()
 
     def visualizer(self):
         blockchain_graph_nodes = []
