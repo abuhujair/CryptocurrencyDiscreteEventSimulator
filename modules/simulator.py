@@ -1,38 +1,51 @@
 import random
 import numpy as np
 import heapq
-from typing import List
 import copy
 import graphviz as graph
 import networkx as nx
 import matplotlib.pyplot as plt
+import os
 
+import settings
+from utils.logger import get_logger
 from modules.network import Node
 from modules.event_handler import Event, EventHandler
 from modules.blockchain import Block, Transaction
 
 
 class Simulator:
-    """Simulator instance
+    """Discrete event simulator for etherum blockchain. 
     """
     def __init__(self, num_nodes:int , slow_nodes:float, low_hash:float, inter_arrival_time:float,
                     inter_arrival_time_block:float , simulation_time:float, MAX_BLOCK_LENGTH: int):
+        """Initialize node, network and simulator parameters
+
+        Args:
+            num_nodes (int): Number of nodes in the network
+            slow_nodes (float): Percentage of slow nodes
+            low_hash (float): Percentage of low hashing power nodes
+            inter_arrival_time (float): Inter-arrival time between transactions
+            inter_arrival_time_block (float): Inter-arrival time between blocks
+            simulation_time (float): Simulation time 
+            MAX_BLOCK_LENGTH (int): Max number of transactions in a block
+        """
         self.num_nodes = num_nodes
         self.num_slow_nodes = int(num_nodes*slow_nodes)
         self.num_low_hash = int(num_nodes*low_hash)
         self.iat = inter_arrival_time
         self.iat_block = inter_arrival_time_block
         self.MAX_BLOCK_LENGTH = MAX_BLOCK_LENGTH
+        self.logger = get_logger("EVENT")
 
         self.gen_exp = np.random.default_rng()  # Exponential distribution generator
         # Create peer network
         self.nodes = self.create_nodes()    # Dictionary [id: Node]
-        self.create_network()
+        self.create_network()   # Create edges between peers
 
-
-        self.networkVisualizer()
+        self.networkVisualizer()    # Visulaize the peer network
         
-        self.event_queue = list()
+        self.event_queue = list()   # Priority queue of event queue [Event]
         self.event_handler = EventHandler(self.event_queue, self.nodes, self.iat, self.iat_block)
     
         # Initialize first transaction events
@@ -53,21 +66,28 @@ class Simulator:
             )
             self.event_handler.add_event(new_event)
 
+        # Run the simulation
         self.run_simulation(simulation_time=simulation_time)
 
+        # Save the results
         for node in list(self.nodes.values()):
-            print(node.blockchain)
+            with open(f"{settings.NODES_DIR}/{node.id}_blockchain.txt", "w") as file:
+                file.write(str(node.blockchain))
+
+        # Save blockchain visualizations
+        self.visualizer()
 
     # ==========================================================================================
     # Peer network
     def create_nodes(self):
-        """Create all nodes in the blockchain
+        """Create all peer nodes in the blockchain
 
         Returns:
             dict: Dictionary [id: Node] of all the newly generated nodes
         """
         transactions = list()
         account_balance = dict()
+
         # Generate genesis block transactions
         for i in range(self.num_nodes):
             coins = random.uniform(50, 500)
@@ -80,6 +100,7 @@ class Simulator:
             transactions.append(new_transaction)
             account_balance[i] = coins
 
+        # Genereate the genesis block
         genesis_block = Block(
             parent_block_id=None,
             block_position=0,
@@ -93,8 +114,8 @@ class Simulator:
 
         hash_power = 1/(10*self.num_nodes - 9*self.num_low_hash)
 
-        self.slow_nodes = random.sample(range(self.num_nodes), self.num_slow_nodes)
-        self.low_hash_p = random.sample(range(self.num_nodes), self.num_low_hash)
+        self.slow_nodes = random.sample(range(self.num_nodes), self.num_slow_nodes)     # Slow nodes
+        self.low_hash_p = random.sample(range(self.num_nodes), self.num_low_hash)   # Low hashing power nodes
 
         for i in range(self.num_nodes):
             if (i in self.slow_nodes) and (i in self.low_hash_p):
@@ -125,31 +146,32 @@ class Simulator:
                                 hash=hash_power*10,
                                 MAX_BLOCK_LENGTH=self.MAX_BLOCK_LENGTH)
 
+        self.logger.info("Peer nodes created successfully")
         return nodes
 
     def create_network(self):
-        """Create interconnections between nodes
+        """Create interconnections between peer nodes in the network. 
         """
         while True:
             for node in self.nodes.values():
                 for rand_peer in random.sample(list(self.nodes.values()), self.num_nodes):
-                    if len(node.peers) == node.num_peers:
+                    if len(node.peers) == node.num_peers:   # Max peers attached
                         break
                     if node != rand_peer and (rand_peer.id not in node.peers) and len(node.peers)<node.num_peers and len(rand_peer.peers)<rand_peer.num_peers:
                         propagation_delay = round(random.uniform(0.01, 0.5), 4)
                         node.add_peer(rand_peer.id, propagation_delay)
                         rand_peer.add_peer(node.id, propagation_delay)
             
-            if self.check_connectivity():
+            if self.check_connectivity():   # If entire network is formed with specified properties
                 break
             
-            for node in self.nodes.values():
+            for node in self.nodes.values():    # Reset the network
                 node.delete_peers()
 
-        print("Connected P2P Network Created.")
+        self.logger.info("Connected P2P Network Created.")
 
     def check_connectivity(self):
-        """Check if the blockchain is valid
+        """Check if the peer network is formed with the specified properties
 
         Returns:
             bool: True if valid, else False
@@ -171,13 +193,15 @@ class Simulator:
         if self.num_nodes == len(visited):
             return True
 
-        print("The Network is not connected.")
+        self.logger.info("The Network is not connected. Retrying ...")
         return False
     
     # ==========================================================================================
     # Report and Visualization Functions
-
     def networkVisualizer(self):
+        """Generate graph for peer nodes network of the simulator. 
+        Different colors represent different types of nodes and edges.
+        """
         network_graph_nodes = []
         network_graph_edges = []
         colormap_nodes = []
@@ -204,11 +228,15 @@ class Simulator:
         pos = nx.spring_layout(G)
         nx.draw(G, pos, node_color=colormap_nodes, edge_color=colormap_edges, with_labels=True)
         plt.legend(["NODES: Blue:- Low Hash Power & Green:- High Hash Power", "EDGE: Red:- Fast connection & Gray:- Slow Connection"], loc='best')
-        plt.show()
+        plt.savefig(f"{settings.REPORT_DIR}/peer_network.png")
+        self.logger.info("Peer network visualization saved")
 
     def visualizer(self):
+        """Visualize the final generated blockchain
+        """
         blockchain_graph_nodes = []
         blockchain_graph_edges = []
+
         for user in self.nodes.values(): 
             for node in list(user.blockchain.blocks.values()):
                 blockchain_graph_nodes.append(node.id)
@@ -216,39 +244,35 @@ class Simulator:
                     continue
                 blockchain_graph_edges.append((node.id, node.parent_block_id))
             nodes = {}
+            
             for i in range(len(blockchain_graph_nodes)):
                 nodes[blockchain_graph_nodes[i]]=i
             G = graph.Digraph(f"{user.id}")
             G.attr(rankdir='LR',splines='line')
+            
             for i in blockchain_graph_nodes:
                 G.node(str(nodes[i]))
+            
             for i in blockchain_graph_edges:
                 G.edge(str(nodes[list(i)[0]]),str(nodes[list(i)[1]]))   
-            # G.view()
-            G.render(f"results/node_{user.id}s_blockchain")
+            
+            G.render(f"{settings.NODES_DIR}/{user.id}_blockchain")  # Save blockchain images
             G.clear()
+            os.remove(f"{settings.NODES_DIR}/{user.id}_blockchain") # Remove metadata
             blockchain_graph_edges.clear()
             blockchain_graph_nodes.clear()
-            # del(G)
-            # del(blockchain_graph_edges)
-            # del(blockchain_graph_edges)
-        # print(blockchain_graph_nodes)
-        # print(blockchain_graph_edges)
-        # G = nx.DiGraph()
-        # G.add_nodes_from(blockchain_graph_nodes)
-        # G.add_edges_from(blockchain_graph_edges)
 
-        # # Draw the graph using a spring layout
-        # pos = nx.nx_agraph.graphviz_layout(G, prog='neato')
-        # nx.draw(G, pos, with_labels=False)
-        
-        # plt.show()
     # ==========================================================================================
     # Simulator functions
+
     def run_simulation(self, simulation_time:float):
+        """Run simulation of ethereum
+
+        Args:
+            simulation_time (float): Simulation time
+        """
         current_time = 0
         while current_time < simulation_time and self.event_queue != []:
             event = heapq.heappop(self.event_queue)
             current_time = event.time
             self.event_handler.handle_event(event)
-        self.visualizer()
