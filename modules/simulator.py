@@ -165,7 +165,8 @@ class Simulator:
             pos = nx.spring_layout(G)
             nx.draw(G, pos, node_color=colormap_nodes, edge_color=colormap_edges, with_labels=True)
             plt.legend(["NODES: Blue:- Low Hash Power & Green:- High Hash Power", "EDGE: Red:- Fast connection & Gray:- Slow Connection"], loc='best')
-            plt.show()
+            # plt.show()
+            plt.savefig(f"results/Node_Network.png")
 
 
             # G = graph.Digraph('parent', engine='neato')
@@ -230,7 +231,7 @@ class Simulator:
             for i in blockchain_graph_edges:
                 G.edge(str(nodes[list(i)[0]]),str(nodes[list(i)[1]]))   
             # G.view()
-            G.render(f"results/{user.id}")
+            G.render(f"results/node_{user.id}s_blockchain")
             G.clear()
             blockchain_graph_edges.clear()
             blockchain_graph_nodes.clear()
