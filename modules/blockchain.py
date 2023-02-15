@@ -97,75 +97,8 @@ class Blockchain:
             or child_block.block_position == self.current_block.block_position +1 ): #a new block is added to forked chain
             self.current_block = child_block
     
-    # def __str__(self) -> str:
-    #     nodes = {}
-    #     id_mapping = {}
-    #     counter  = 0
-    #     for node in list(self.blocks.values()):
-    #         id_mapping[node.id] = counter
-    #         counter += 1
-
-    #     # for node in list(self.blocks.values()):
-    #     #     try:
-    #     #         if id_mapping[node.parent_block_id] in nodes.keys():
-    #     #             nodes[id_mapping[node.parent_block_id]].append(("BlockID: "+node.parent_block_id,"NodePosition: "+str(node.block_position),
-    #     #                 "NumberTXNs: "+str(len(node.transactions)),"ChildBlockID: "+node.id,"ChildBlockNode: "+str(id_mapping[node.id])))
-    #     #         else:
-    #     #             nodes[id_mapping[node.parent_block_id]] = [("BlockID: "+node.parent_block_id,"NodePosition: "+str(node.block_position),
-    #     #                 "NumberTXNs: "+str(len(node.transactions)),"ChildBlockID "+node.id,"ChildBlockNode: "+str(id_mapping[node.id]))]
-    #     #     except:
-    #     #         pass
-
-    #     for node in list(self.blocks.values()):
-    #         try:
-    #             if id_mapping[node.parent_block_id] in nodes.keys():
-    #                 nodes[id_mapping[node.parent_block_id]].append(("BlockID: "+node.parent_block_id,"NodePosition: "+str(node.block_position)+"ChildID: "+node.id+ "\n"))
-    #             else:
-    #                 nodes[id_mapping[node.parent_block_id]] = [("BlockID: "+node.parent_block_id,"NodePosition: "+str(node.block_position)+"ChildID: "+node.id+ "\n")]
-    #         except:
-    #             pass
-        
-    #     visualizer = nx.DiGraph()
-
-
-    #     return f"{nodes}"
     def __str__(self) -> str:
-        # blockchain_graph_nodes = []
-        # blockchain_graph_edges = []
-        # for node in list(self.blocks.values()):
-        #     blockchain_graph_nodes.append(node.id)
-        #     if node.parent_block_id == None:    # Genesis block
-        #         continue
-        #     blockchain_graph_edges.append((node.id, node.parent_block_id))
-        # # print(blockchain_graph_nodes)
-        # # print(blockchain_graph_edges)
-        # # G = nx.DiGraph()
-        # # G.add_nodes_from(blockchain_graph_nodes)
-        # # G.add_edges_from(blockchain_graph_edges)
-
-        # # # Draw the graph using a spring layout
-        # # pos = nx.nx_agraph.graphviz_layout(G, prog='neato')
-        # # nx.draw(G, pos, with_labels=False)
-        # nodes = {}
-        # for i in range(len(blockchain_graph_nodes)):
-        #     nodes[blockchain_graph_nodes[i]]=i
-
-        # G = graph.Digraph('parent')
-        # G.attr(rankdir='LR',splines='line')
-        # for i in blockchain_graph_nodes:
-        #     G.node(str(nodes[i]))
-        # for i in blockchain_graph_edges:
-        #     G.edge(str(nodes[list(i)[0]]),str(nodes[list(i)[1]]))   
-        # G.view()
-        # # plt.show()
         output = f"Blockchain\n"
         for block in list(self.blocks.values()):
             output += f"\t{block}\n"
         return output
-    
-    # def __str__(self) -> str:
-    #     output = f"Blockchain\n"
-    #     for block in list(self.blocks.values()):
-    #         output += f"\t{block}\n"
-    
-    #     return output

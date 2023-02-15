@@ -142,9 +142,10 @@ class EventHandler:
         elif event.type == 5:   # Receive block
             block = event.extra_parameters['block']
             event_creator_node = event.extra_parameters['event_creator']
-            
+            flag = False
             while event.node.receive_block(block):
                 # Propagate the block
+                flag = True
                 for peer_id in event.node.peers:
                     if peer_id == event_creator_node:   # Circular dependency
                         continue
@@ -163,11 +164,13 @@ class EventHandler:
                 if block.id in event.node.blockchain.cached_blocks:
                     block = event.node.blockchain.cached_blocks[block.id]
                 else:
-                    new_block = event.node.create_block()
-                    self.add_event(Event(
+                    break
+
+            if flag:
+                new_block = event.node.create_block()
+                self.add_event(Event(
                         event_time=round(event.time+self.gen_exp.exponential(self.iat_b/event.node.hash),4),
                         event_type=4,
                         event_node=event.node,
                         block=new_block
                     ))
-                    break
