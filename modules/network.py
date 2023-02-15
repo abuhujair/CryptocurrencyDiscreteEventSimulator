@@ -246,8 +246,9 @@ class Node:
         if block.id in self.blockchain.blocks.keys():
             return False
 
-        if block.parent_block_id not in self.blockchain.blocks.keys() and block.parent_block_id not in self.blockchain.cached_blocks:
-            self.blockchain.cached_blocks[block.parent_block_id] = block
+        if block.parent_block_id not in self.blockchain.blocks.keys():
+            if block.parent_block_id not in self.blockchain.cached_blocks:
+                self.blockchain.cached_blocks[block.parent_block_id] = block
             return False
         
         if block.parent_block_id in self.blockchain.cached_blocks:
