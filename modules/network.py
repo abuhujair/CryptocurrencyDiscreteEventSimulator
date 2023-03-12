@@ -10,7 +10,7 @@ from modules.blockchain import Blockchain, Block, Transaction
 class Node:
     """Peer node of the network
     """
-    def __init__(self, node_id: int, node_type: int, genesis_block:Block, hash:float, MAX_BLOCK_LENGTH:int):
+    def __init__(self, node_id: int, node_type: int, genesis_block:Block, hash:float, MAX_BLOCK_LENGTH:int, node_label:int):
         """Initialize peer node with miner properties.
 
         Args:
@@ -21,6 +21,10 @@ class Node:
             MAX_BLOCK_LENGTH (int): Maximum number of transactions in a block
         """
         self.id = node_id
+        self.node_label = node_label # 0: Honest Miner, 1: Selfish Miner, 2: Stubborn Miner
+        if self.node_label == 1 or self.node_label== 2:
+            self.block_queue = list() # List[Block] of block pending to be transmitted by attacker
+
         self.type = node_type
         self.MAX_BLOCK_LENGTH = MAX_BLOCK_LENGTH
 
@@ -260,7 +264,7 @@ class Node:
             pending_transactions = self.create_new_pool(block) #create new pending transaction pool
             if self.verify_block(block,pending_transactions,self.blockchain.blocks[block.parent_block_id]):
                 self.blockchain.add_block(child_block = block)
-                if(block.block_position == latest_block_position+1): #If the chain is being switched, utxo_set need to be updated    
+                if(block.block_position == latest_block_position+1): #If the chain is being switched, pending transaction pool need to be updated    
                     self.pending_transactions = pending_transactions
                     self.execute_block(block)
             else:
@@ -272,7 +276,7 @@ class Node:
                 self.execute_block(block)
             else:
                 return False
-
+        #Return true if the block is added to the chain (not necessarily main chain)
         return True
 
     def create_new_pool(self, block:Block):
