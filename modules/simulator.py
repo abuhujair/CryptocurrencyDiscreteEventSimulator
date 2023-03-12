@@ -18,7 +18,8 @@ class Simulator:
     """Discrete event simulator for etherum blockchain. 
     """
     def __init__(self, num_nodes:int , slow_nodes:float, low_hash:float, inter_arrival_time:float,
-                    inter_arrival_time_block:float , simulation_time:float, MAX_BLOCK_LENGTH: int):
+                    inter_arrival_time_block:float , simulation_time:float, MAX_BLOCK_LENGTH: int, 
+                    attack_type:int, adv_hash:float, adv_connected:float):
         """Initialize node, network and simulator parameters
 
         Args:
@@ -36,6 +37,9 @@ class Simulator:
         self.iat = inter_arrival_time
         self.iat_block = inter_arrival_time_block
         self.MAX_BLOCK_LENGTH = MAX_BLOCK_LENGTH
+        self.attack_type = attack_type
+        self.adv_hash = adv_hash
+        self.adv_connected = adv_connected
         self.logger = get_logger("EVENT")
 
         self.gen_exp = np.random.default_rng()  # Exponential distribution generator
@@ -111,16 +115,24 @@ class Simulator:
         )
 
         nodes = {}
+        hash_power = (1 - self.adv_hash)/(10*(self.num_nodes-1) - 9*self.num_low_hash)
 
-        hash_power = 1/(10*self.num_nodes - 9*self.num_low_hash)
+        self.slow_nodes = random.sample(range(1 , self.num_nodes), self.num_slow_nodes)     # Slow nodes
+        self.low_hash_p = random.sample(range(1 , self.num_nodes), self.num_low_hash)   # Low hashing power nodes
 
-        self.slow_nodes = random.sample(range(self.num_nodes), self.num_slow_nodes)     # Slow nodes
-        self.low_hash_p = random.sample(range(self.num_nodes), self.num_low_hash)   # Low hashing power nodes
+        nodes[0] = Node(node_id=0,
+                        node_type=1,
+                        #node_label=self.attack_type,
+                        genesis_block=copy.deepcopy(genesis_block),
+                        hash=self.adv_hash,
+                        MAX_BLOCK_LENGTH=self.MAX_BLOCK_LENGTH)
+        nodes[0].num_peers = int(self.adv_connected*self.num_nodes)
 
-        for i in range(self.num_nodes):
+        for i in range(1, self.num_nodes):
             if (i in self.slow_nodes) and (i in self.low_hash_p):
                 nodes[i] = Node(node_id=i,
                                 node_type=0,
+                                #node_label=0,
                                 genesis_block=copy.deepcopy(genesis_block),
                                 hash=hash_power,
                                 MAX_BLOCK_LENGTH=self.MAX_BLOCK_LENGTH)
@@ -128,6 +140,7 @@ class Simulator:
             elif i in self.slow_nodes:
                 nodes[i] = Node(node_id=i,
                                 node_type=0,
+                                #node_label=0,
                                 genesis_block=copy.deepcopy(genesis_block),
                                 hash=hash_power*10,
                                 MAX_BLOCK_LENGTH=self.MAX_BLOCK_LENGTH)
@@ -135,6 +148,7 @@ class Simulator:
             elif i in self.low_hash_p:
                 nodes[i] = Node(node_id=i,
                                 node_type=1,
+                                #node_label=0,
                                 genesis_block=copy.deepcopy(genesis_block),
                                 hash=hash_power,
                                 MAX_BLOCK_LENGTH=self.MAX_BLOCK_LENGTH)
@@ -142,6 +156,7 @@ class Simulator:
             else:
                 nodes[i] = Node(node_id=i,
                                 node_type=1,
+                                #node_label=0,
                                 genesis_block=copy.deepcopy(genesis_block),
                                 hash=hash_power*10,
                                 MAX_BLOCK_LENGTH=self.MAX_BLOCK_LENGTH)
