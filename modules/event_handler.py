@@ -155,6 +155,7 @@ class EventHandler:
             # Propogate Block
             self.propogateBlock(event,block,event_creator_node)
 
+            # If there are any cached block with received block as block id, verify and add them in blockchain
             if block.id in event.node.blockchain.cached_blocks:
                 block = event.node.blockchain.cached_blocks[block.id]
             else:
@@ -181,17 +182,18 @@ class EventHandler:
 
             # if the lead is two, empty the chain
             if (len(event.node.block_queue) == 2 and                    
-                event.node.block_queue[0].block_position <= block.block_position):
+                event.node.block_queue[0].block_position == block.block_position):
                 while len(event.node.block_queue):
                     attacker_block = event.node.block_queue.pop(0)
                     self.propogateBlock(event,attacker_block,event.node.id)
 
             # If lead is 1 or more than 2, release a block.
             elif ( len(event.node.block_queue) and
-                   event.node.block_queue[0].block_position <= block.block_position):
+                   event.node.block_queue[0].block_position == block.block_position):
                 attacker_block = event.node.block_queue.pop(0)
                 self.propogateBlock(event,attacker_block,event.node.id)
 
+            # If there are any cached block with received block as block id, verify and add them in blockchain
             if block.id in event.node.blockchain.cached_blocks:
                 block = event.node.blockchain.cached_blocks[block.id]
             else:
@@ -222,6 +224,7 @@ class EventHandler:
                 attacker_block = event.node.block_queue.pop(0)
                 self.propogateBlock(event,attacker_block,event.node.id)
 
+            # If there are any cached block with received block as block id, verify and add them in blockchain
             if block.id in event.node.blockchain.cached_blocks:
                 block = event.node.blockchain.cached_blocks[block.id]
             else:

@@ -140,7 +140,6 @@ class Simulator:
                                 genesis_block=copy.deepcopy(genesis_block),
                                 hash=hash_power,
                                 MAX_BLOCK_LENGTH=self.MAX_BLOCK_LENGTH,
-                                node_label=0,
                                 )
             
             elif i in self.slow_nodes:
@@ -149,7 +148,6 @@ class Simulator:
                                 genesis_block=copy.deepcopy(genesis_block),
                                 hash=hash_power*10,
                                 MAX_BLOCK_LENGTH=self.MAX_BLOCK_LENGTH,
-                                node_label=0,
                                 )
 
             elif i in self.low_hash_p:
@@ -158,7 +156,6 @@ class Simulator:
                                 genesis_block=copy.deepcopy(genesis_block),
                                 hash=hash_power,
                                 MAX_BLOCK_LENGTH=self.MAX_BLOCK_LENGTH,
-                                node_label=0
                                 )
             
             else:
@@ -167,7 +164,6 @@ class Simulator:
                                 genesis_block=copy.deepcopy(genesis_block),
                                 hash=hash_power*10,
                                 MAX_BLOCK_LENGTH=self.MAX_BLOCK_LENGTH,
-                                node_label=0
                                 )
         self.logger.info("Peer nodes created successfully")
         return nodes
@@ -266,19 +262,21 @@ class Simulator:
         blockchain_graph_edges = []
 
         blocks = {}
-        blocks['Curr'] = 'L. Chain'
+        blocks['Curr'] = 'Longest\nChain'
             
         block_count = 0
         for node in self.nodes.values(): 
             for block in list(node.blockchain.blocks.values()):
                 blockchain_graph_nodes.append(block.id)
                 if block.id not in blocks:
-                    blocks[block.id] = block_count
+                    blocks[block.id] = str(block_count)+',\n'+str(block.coinbase_transaction.payee)
                     block_count+=1
                 if block.parent_block_id == None:    # Genesis block
                     continue
                 blockchain_graph_edges.append((block.id, block.parent_block_id))
 
+            blockchain_graph_nodes.sort()
+            
             blockchain_graph_nodes.append('Curr')
             blockchain_graph_edges.append(('Curr',node.blockchain.current_block.id))
 
@@ -308,7 +306,8 @@ class Simulator:
         """
         print("Simulation started.")
         current_time = 0
-        for period in range(int(simulation_time/20), int(simulation_time)+1, int(simulation_time/20)):                
+        period = int(simulation_time/20) if simulation_time>20 else 1
+        for period in range(period, int(simulation_time)+1, period):                
             while current_time < period and self.event_queue != []:
                 event = heapq.heappop(self.event_queue)
                 current_time = event.time

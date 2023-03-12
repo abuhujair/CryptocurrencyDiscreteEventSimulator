@@ -10,7 +10,7 @@ from modules.blockchain import Blockchain, Block, Transaction
 class Node:
     """Peer node of the network
     """
-    def __init__(self, node_id: int, node_type: int, genesis_block:Block, hash:float, MAX_BLOCK_LENGTH:int, node_label:int):
+    def __init__(self, node_id: int, node_type: int, genesis_block:Block, hash:float, MAX_BLOCK_LENGTH:int, node_label:int=0):
         """Initialize peer node with miner properties.
 
         Args:

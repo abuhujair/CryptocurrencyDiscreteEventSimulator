@@ -40,12 +40,12 @@ if __name__ == '__main__':
         num_nodes = 50,
         slow_nodes = 0.5,
         low_hash = 0.5,
-        inter_arrival_time = 1,
-        inter_arrival_time_block = 5,
-        simulation_time = 500.0,
+        inter_arrival_time = 1.0,
+        inter_arrival_time_block = 10.0,
+        simulation_time = 300.0,
         MAX_BLOCK_LENGTH = 500,
         attack_type = 1,
-        adv_hash = 0.25,
+        adv_hash = 0.35,
         adv_connected = 0.50
     )
 
