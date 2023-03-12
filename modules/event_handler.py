@@ -42,11 +42,11 @@ class Event:
 class EventHandler:
     """Event handler instance of the simulator
     """
-    def __init__(self, event_queue:List[Event], nodes:Dict[int, Node], iat:float, iat_b:float) -> None:
+    def __init__(self, event_queue:List[Event], nodes:Dict[int, Node], iat:float, iat_b:float, logger) -> None:
         self.event_queue = event_queue   # Priority list for events
         self.nodes = nodes
         self.gen_exp = np.random.default_rng()
-        self.logger = get_logger("EVENT")
+        self.logger = logger
         self.iat = iat
         self.iat_b = iat_b
     

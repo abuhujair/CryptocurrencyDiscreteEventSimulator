@@ -19,7 +19,7 @@ class Simulator:
     """
     def __init__(self, num_nodes:int , slow_nodes:float, low_hash:float, inter_arrival_time:float,
                     inter_arrival_time_block:float , simulation_time:float, MAX_BLOCK_LENGTH: int, 
-                    attack_type:int, adv_hash:float, adv_connected:float):
+                    attack_type:int=0, adv_hash:float=0.0, adv_connected:float=0.0):
         """Initialize node, network and simulator parameters
 
         Args:
@@ -30,6 +30,9 @@ class Simulator:
             inter_arrival_time_block (float): Inter-arrival time between blocks
             simulation_time (float): Simulation time 
             MAX_BLOCK_LENGTH (int): Max number of transactions in a block
+            attack_type (int): Default 0. 1 for Selfish Mining, 2 for Stubborn Mining
+            adv_hash (float): Default 0. Hashing power of attacker.
+            adv_connected (float): Default 0, Percentage of node adversary is connected to.
         """
         self.num_nodes = num_nodes
         self.num_slow_nodes = int(num_nodes*slow_nodes)
@@ -40,6 +43,7 @@ class Simulator:
         self.attack_type = attack_type
         self.adv_hash = adv_hash
         self.adv_connected = adv_connected
+
         self.logger = get_logger("EVENT")
 
         self.gen_exp = np.random.default_rng()  # Exponential distribution generator
@@ -50,7 +54,7 @@ class Simulator:
         self.networkVisualizer()    # Visulaize the peer network
         
         self.event_queue = list()   # Priority queue of event queue [Event]
-        self.event_handler = EventHandler(self.event_queue, self.nodes, self.iat, self.iat_block)
+        self.event_handler = EventHandler(self.event_queue, self.nodes, self.iat, self.iat_block, self.logger)
     
         # Initialize first transaction events
         for node in self.nodes.values():
@@ -117,57 +121,61 @@ class Simulator:
         nodes = {}
         hash_power = (1 - self.adv_hash)/(10*(self.num_nodes-1) - 9*self.num_low_hash)
 
-        self.slow_nodes = random.sample(range(1 , self.num_nodes), self.num_slow_nodes)     # Slow nodes
-        self.low_hash_p = random.sample(range(1 , self.num_nodes), self.num_low_hash)   # Low hashing power nodes
+        self.slow_nodes = random.sample(range(1 if self.attack_type!=0 else 0 , self.num_nodes), self.num_slow_nodes)     # Slow nodes
+        self.low_hash_p = random.sample(range(1 if self.attack_type!=0 else 0 , self.num_nodes), self.num_low_hash)   # Low hashing power nodes
+        if self.attack_type!=0:
+            nodes[0] = Node(node_id=0,
+                            node_type=1,
+                            genesis_block=copy.deepcopy(genesis_block),
+                            hash=self.adv_hash,
+                            MAX_BLOCK_LENGTH=self.MAX_BLOCK_LENGTH,
+                            node_label=self.attack_type
+                            )
+            nodes[0].num_peers = int(self.adv_connected*self.num_nodes)
 
-        nodes[0] = Node(node_id=0,
-                        node_type=1,
-                        #node_label=self.attack_type,
-                        genesis_block=copy.deepcopy(genesis_block),
-                        hash=self.adv_hash,
-                        MAX_BLOCK_LENGTH=self.MAX_BLOCK_LENGTH)
-        nodes[0].num_peers = int(self.adv_connected*self.num_nodes)
-
-        for i in range(1, self.num_nodes):
+        for i in range(1 if self.attack_type!=0 else 0, self.num_nodes):
             if (i in self.slow_nodes) and (i in self.low_hash_p):
                 nodes[i] = Node(node_id=i,
                                 node_type=0,
-                                #node_label=0,
                                 genesis_block=copy.deepcopy(genesis_block),
                                 hash=hash_power,
-                                MAX_BLOCK_LENGTH=self.MAX_BLOCK_LENGTH)
+                                MAX_BLOCK_LENGTH=self.MAX_BLOCK_LENGTH,
+                                node_label=0,
+                                )
             
             elif i in self.slow_nodes:
                 nodes[i] = Node(node_id=i,
                                 node_type=0,
-                                #node_label=0,
                                 genesis_block=copy.deepcopy(genesis_block),
                                 hash=hash_power*10,
-                                MAX_BLOCK_LENGTH=self.MAX_BLOCK_LENGTH)
+                                MAX_BLOCK_LENGTH=self.MAX_BLOCK_LENGTH,
+                                node_label=0,
+                                )
 
             elif i in self.low_hash_p:
                 nodes[i] = Node(node_id=i,
                                 node_type=1,
-                                #node_label=0,
                                 genesis_block=copy.deepcopy(genesis_block),
                                 hash=hash_power,
-                                MAX_BLOCK_LENGTH=self.MAX_BLOCK_LENGTH)
+                                MAX_BLOCK_LENGTH=self.MAX_BLOCK_LENGTH,
+                                node_label=0
+                                )
             
             else:
                 nodes[i] = Node(node_id=i,
                                 node_type=1,
-                                #node_label=0,
                                 genesis_block=copy.deepcopy(genesis_block),
                                 hash=hash_power*10,
-                                MAX_BLOCK_LENGTH=self.MAX_BLOCK_LENGTH)
-
+                                MAX_BLOCK_LENGTH=self.MAX_BLOCK_LENGTH,
+                                node_label=0
+                                )
         self.logger.info("Peer nodes created successfully")
         return nodes
 
     def create_network(self):
         """Create interconnections between peer nodes in the network. 
-        """
-        while True:
+        """            
+        while True:                        
             for node in self.nodes.values():
                 for rand_peer in random.sample(list(self.nodes.values()), self.num_nodes):
                     if len(node.peers) == node.num_peers:   # Max peers attached
@@ -286,8 +294,11 @@ class Simulator:
         Args:
             simulation_time (float): Simulation time
         """
+        print("Simulation started.")
         current_time = 0
-        while current_time < simulation_time and self.event_queue != []:
-            event = heapq.heappop(self.event_queue)
-            current_time = event.time
-            self.event_handler.handle_event(event)
+        for period in range(int(simulation_time/20), int(simulation_time), int(simulation_time/20)):                
+            while current_time < period and self.event_queue != []:
+                event = heapq.heappop(self.event_queue)
+                current_time = event.time
+                self.event_handler.handle_event(event)
+            print("Simulation completed for: "+str(current_time)+"s")
