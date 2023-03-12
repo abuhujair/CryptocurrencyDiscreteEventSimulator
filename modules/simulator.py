@@ -269,7 +269,7 @@ class Simulator:
             for block in list(node.blockchain.blocks.values()):
                 blockchain_graph_nodes.append(block.id)
                 if block.id not in blocks:
-                    blocks[block.id] = str(block_count)+',\n'+str(block.coinbase_transaction.payee)+',\n'+str(block.timestamp)
+                    blocks[block.id] = 'ID- '+str(block_count)+',\nN- '+str(block.coinbase_transaction.payee)+',\nTS- '+str(block.timestamp)
                     block_count+=1
                 if block.parent_block_id == None:    # Genesis block
                     continue

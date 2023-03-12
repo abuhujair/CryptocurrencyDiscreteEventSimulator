@@ -37,12 +37,12 @@ if __name__ == '__main__':
     #     exit(1)
     
     obj = Simulator(
-        num_nodes = 50,
+        num_nodes = 100,
         slow_nodes = 0.5,
         low_hash = 0.5,
         inter_arrival_time = 1.0,
         inter_arrival_time_block = 10.0,
-        simulation_time = 300.0,
+        simulation_time = 200.0,
         MAX_BLOCK_LENGTH = 500,
         attack_type = 1,
         adv_hash = 0.35,
