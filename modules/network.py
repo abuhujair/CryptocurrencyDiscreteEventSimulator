@@ -4,22 +4,27 @@ from typing import Dict
 import numpy as np
 import copy
 
-from modules.blockchain import Blockchain, Block, Utxo, Transaction
+import settings
+from modules.blockchain import Blockchain, Block, Transaction
 
 class Node:
-    """Node object for the blockchain
+    """Peer node of the network
     """
-    def __init__(self, node_id: int, node_type: int, genesis_block:Block, 
-                    utxo_set:Dict[str, Utxo], hash:float, MAX_BLOCK_LENGTH:int):
-        """Node object
+    def __init__(self, node_id: int, node_type: int, genesis_block:Block, hash:float, MAX_BLOCK_LENGTH:int, node_label:int):
+        """Initialize peer node with miner properties.
 
         Args:
             node_id (int): Unique id for the node
             node_type (int): 0 - Slow, 1 - Fast 
             genesis_block (Block): Genesis block of the blockchain
-            utxo_set (Dict[str, Utxo]): Utxo set of the miner
+            hash (float): Hashing power
+            MAX_BLOCK_LENGTH (int): Maximum number of transactions in a block
         """
         self.id = node_id
+        self.node_label = node_label # 0: Honest Miner, 1: Selfish Miner, 2: Stubborn Miner
+        if self.node_label == 1 or self.node_label== 2:
+            self.block_queue = list() # List[Block] of block pending to be transmitted by attacker
+
         self.type = node_type
         self.MAX_BLOCK_LENGTH = MAX_BLOCK_LENGTH
 
@@ -29,20 +34,17 @@ class Node:
         self.hash = hash
 
         self.blockchain = Blockchain(genesis_block)
-        self.utxo_set = utxo_set  # Dict[utxo_id, Utxo]
 
-        self.own_utxo = dict()  # Nodes own money
-        for utxo in list(utxo_set.values()):
-            if utxo.owner == self.id:
-                self.own_utxo[utxo.id] = utxo
-
+        self.pending_transactions = dict()  # [transaction_id, Transaction]
         self.transactions = dict()  # [transaction_id, Transaction]
         self.gen_exp = np.random.default_rng()
+        #TODO how to maintain current account balance across all operations
+        self.current_balance = self.blockchain.current_block.account_balance[self.id]
 
     # ========================================================================================
     # Peer functions
     def add_peer(self, node_id: int, propagation_delay:float):
-        """Add new peer to the node
+        """Add new peer to current peer
 
         Args:
             node_id (int): Unique id of the node
@@ -87,45 +89,16 @@ class Node:
         Returns:
             Transaction: Transaction object
         """
-        total_money = 0
-        for utxo in list(self.own_utxo.values()):
-            total_money += utxo.value
+        total_money = self.blockchain.current_block.account_balance[self.id]
 
-        value = round(random.uniform(0.0001, total_money),4)
+        value = random.uniform(0.0001, total_money)
         new_transaction = Transaction(
             payer=self.id,
             payee=payee,
             value=value,
             timestamp=timestamp
         )
-
-        input_utxos = list()
-        current_value = 0
-        for utxo in list(self.own_utxo.values()):
-            current_value += utxo.value
-            input_utxos.append(utxo)
-            if current_value >= value:
-                break
-
-        for utxo in input_utxos:
-            del self.own_utxo[utxo.id]
-
-        money_back = current_value - value
-        output_utxos = list()
-        output_utxos.append(Utxo(   # Money back Utxo
-            transaction_id=new_transaction.id,
-            owner=self.id,
-            value=money_back
-        ))
-        # No need to do this, as own_utxo will be added once the transaction is verified and block is received back.
-        # self.own_utxo[output_utxos[0].id] = output_utxos[0]
-
-        output_utxos.append(Utxo(   # paid utxo
-            transaction_id=new_transaction.id,
-            owner=payee,
-            value=value
-        ))
-        new_transaction.add_utxos(input_utxos, output_utxos)
+        self.pending_transactions[new_transaction.id] = new_transaction
         return new_transaction
 
     def receive_txn(self, transaction: Transaction):
@@ -135,35 +108,29 @@ class Node:
             transaction (Transaction): New transaction
 
         Returns:
-            bool: True if already present, False if added now
+            bool: False if already present, True if added now
         """
-        if transaction.id in list(self.transactions.keys()):  # Check in pending transactions
-            return False
-        
-        for txn in self.blockchain.current_block.transactions:  # Check in the latest block
-            if transaction.id == txn.id:
-                return False
-            
-        self.transactions[transaction.id] = transaction
-        # #TODO do we need do the above, if we verify using below condition?
-        # if self.verify_transaction(transaction,self.utxo_set):
-        #     return True
-        return True
+        if transaction.id not in self.transactions:  # Check in pending transactions                
+            self.transactions[transaction.id] = transaction
+            self.pending_transactions[transaction.id] = transaction
+            return True
+        return False
             
     # ========================================================================================
     # Miner functions    
     def mine_block(self, block:Block, timestamp: float):
-        """Operations performed after mining has completed
-
+        """Operation to be performed when mining is successful
         Args:
-            block (Block): New block to be added to the blockchain
+            block (Block): Block Object
+            timestamp (float): Timestamp
+
+        Returns:
+            bool: True, if block is verfied and added to blockchain, else False
         """
         block.timestamp = timestamp
-        if self.verify_block(block) and self.blockchain.add_block(
-            parent_block_id=block.parent_block_id,
-            child_block=block,
-        ):
-            self.execute_block_utxo(block)
+        if self.verify_block(block):
+            self.blockchain.add_block(child_block=block)
+            self.execute_block(block)
             return True
         return False
 
@@ -173,235 +140,168 @@ class Node:
         Returns:
             Block: Newly formed block
         """
+        account_balance = copy.deepcopy(self.blockchain.current_block.account_balance)
         counter = 0
         txns = []
-        utxo_block = []
-        for txn_id in list(self.transactions.keys()):
-            # Condition to check if same utxo is part of multiple transactions.
-            for utxo in self.transactions[txn_id].input_utxos:
-                if utxo.id not in utxo_block:
-                    utxo_block.append(utxo.id)
-                else:
-                    continue
-            if self.verify_transaction(self.transactions[txn_id], self.utxo_set):
-                txns.append(copy.deepcopy(self.transactions[txn_id]))
-            else:
-                del self.transactions[txn_id]
-            counter += 1
+        #TODO Some transaction may not be added to transaction pool ever? How to prioritize.
+        for txn in list(self.pending_transactions.values()):
+            if account_balance[txn.payer] >= txn.value:
+                txns.append(copy.deepcopy(txn))
+                account_balance[txn.payer] -= txn.value
+                account_balance[txn.payee] += txn.value
+                counter += 1
             if counter == self.MAX_BLOCK_LENGTH-1:
                 break
-        
+
+        account_balance[self.id] +=50
         block = Block(
-            parent_block_id = self.blockchain.current_block.id,
-            block_position = self.blockchain.current_block.block_position + 1,
-            timestamp = -1,
-            transactions = txns,
-            block_creator = self.id
+            parent_block_id=self.blockchain.current_block.id,
+            block_position=self.blockchain.current_block.block_position + 1,
+            timestamp=-1,
+            transactions=txns,
+            block_creator=self.id,
+            account_balance=account_balance
         )
         return block 
 
-    def verify_transaction(self, transaction:Transaction, utxo_set: Dict[str, Utxo]):
-        """Verify total incoming and outgoing utxo of the transaction
-
-        Args:
-            transaction (Transaction): Transaction object
-            utxo_set (Dict[str, Utxo]): Utxo set of the miner
-            
-        Returns:
-            bool: True for success, False for failure
-        """
-        
-        total_incoming = 0
-        total_outgoing = 0
-
-        # Check if all the utxo are valid by comparing them from the miner utxo set
-        for utxo in transaction.input_utxos:
-            if not utxo.id in list(utxo_set.keys()):
-                return False
-            
-        for utxo in transaction.input_utxos:
-            total_incoming += utxo.value
-
-        for utxo in transaction.output_utxos:
-            total_outgoing += utxo.value
-
-        if total_incoming != total_outgoing or total_incoming < 0:  # Total incoming = Total outgoing
-            return False
-                
-        return True
-    
-    def execute_transaction(self, transaction: Transaction, utxo_set: Dict[str, Utxo], 
-                            own_utxo:Dict[str,Utxo]):
-        """Execute transaction by modifying the utxo
-
-        Args:
-            transaction (Transaction): Transaction object
-            utxo_set (Dict[str, Utxo], optional): utxo_set to be modified. Defaults to None.
-        """
-
-        for utxo in transaction.input_utxos:
-            del utxo_set[utxo.id]
-            if utxo.owner == self.id and utxo.id in own_utxo:
-                del own_utxo[utxo.id]
-        
-        for utxo in transaction.output_utxos:
-            utxo_set[utxo.id] = utxo
-            if utxo.owner == self.id:
-                own_utxo[utxo.id] = utxo
-
-    def remove_transaction( self, transaction:Transaction, utxo_set: Dict[str, Utxo],
-                            own_utxo:Dict[str,Utxo]):
-        """remove transaction by modifying the utxo_set
-
-        Args:
-            transaction (Transaction): Transaction object
-            utxo_set (Dict[str, Utxo], optional): utxo_set to be modified. Defaults to None.
-        """
-        
-        for utxo in transaction.output_utxos:
-            del utxo_set[utxo.id]
-            if utxo.owner == self.id and utxo.id in own_utxo:
-                del own_utxo[utxo.id]
-        
-        for utxo in transaction.input_utxos:
-            utxo_set[utxo.id] = utxo
-            if utxo.owner == self.id:
-                own_utxo[utxo.id] = utxo
-
-    def verify_block(self, block:Block, utxo_set: Dict[str, Utxo] = None):
-        """Verify if block can be added to the blockchain, for block received or created by it.
-
-        Args:
-            block (Block): Block to be added
-            utxo_set (Dict[str, Utxo]): Utxo set of the miner
-
-        Returns:
-            bool: True if verified, else False
-        """
-        if utxo_set == None: #if primary chain is being verified
-            utxo_set = self.utxo_set
-
-        utxo_block = []
-        for transaction in block.transactions:
-            #check if block contains duplicates utxos
-            for utxo in transaction.input_utxos:
-                if utxo.id not in utxo_block:
-                    utxo_block.append(utxo.id)
-                else:  
-                    return False
-            if not self.verify_transaction(transaction, utxo_set):
-                return False
-        return True
-    
-    def execute_block_utxo(self, block: Block, utxo_set: Dict[str, Utxo] = None, transactions: Dict[str,Transaction] = None,
-            own_utxo: Dict[str,Utxo] = None):
-        """Added new utxo by the block, and update the pending transaction pool
+    def verify_block(self, block:Block, pending_transactions:Dict[str,Transaction] = None, current_block:Block = None):
+        """Verify a block to be added to blockchain
 
         Args:
             block (Block): Block Object
-            utxo_set (Dict[str, Utxo], optional): utxo_set. Defaults to None.
-            transactions (Dict[str,Transaction], optional): transactions. Defaults to None.
+            pending_transactions (Dict[str,Transaction], optional): Pool of pending transactions. Defaults to None.
+            current_block (Block, optional): Pointer to the last block of blockchain. Defaults to None.
+
+        Returns:
+            bool: True if block is verfied successfully, else False
         """
-        if utxo_set == None:
-            utxo_set = self.utxo_set
-        if transactions == None:
-            transactions = self.transactions
-        if own_utxo == None:
-            own_utxo = self.own_utxo
+        if pending_transactions == None: #if primary chain is being verified
+            pending_transactions = self.pending_transactions
+        if current_block == None: #if primary chain is being verified
+            current_block = self.blockchain.current_block
+
+        current_account_balance = copy.deepcopy(current_block.account_balance)
+        sum_outgoing = [0]*len(current_account_balance)
+        txns = dict() #Dict[str,Transaction]
+        for transaction in block.transactions:
+            if transaction not in txns and (transaction.id in pending_transactions 
+                or transaction.id not in self.transactions):
+                txns[transaction.id] = transaction
+                sum_outgoing[transaction.payer] -= transaction.value
+                sum_outgoing[transaction.payee] += transaction.value
+            else:
+                return False
+        
+        #Coinbase Transaction
+        sum_outgoing[block.coinbase_transaction.payee] += block.coinbase_transaction.value
+
+        for node in range(len(current_account_balance)):
+            if (current_account_balance[node]+sum_outgoing[node] < 0  
+                or round(current_account_balance[node]+sum_outgoing[node], 5) != round(block.account_balance[node],5)):
+                return False
+        return True
+    
+    def execute_block(self, block:Block, pending_transactions:Dict[str,Transaction] = None):
+        """Updated the pending transaction pool
+        Args:
+            block (Block): Block Object
+            pending_transactions (Dict[str,Transaction], optional): pending transaction pool. Defaults to None.
+            current_block (Block, optional): last block of blockchain. Defaults to None.
+        """
+        if pending_transactions == None: #if primary chain is being verified
+            pending_transactions = self.pending_transactions
+        # if current_block == None: #if primary chain is being verified
+        #     current_block = self.blockchain.current_block
 
         for txn in block.transactions:
-            if txn.id in transactions:
-                del transactions[txn.id]
-            self.execute_transaction(txn,utxo_set,own_utxo)
-        
-        # Coin base transaction
-        utxo_set[block.miner_utxo.id] = block.miner_utxo
-        if block.miner_utxo.owner == self.id:
-            own_utxo[block.miner_utxo.id] = block.miner_utxo
+            if txn.id in pending_transactions:
+                del pending_transactions[txn.id]
+            else:
+                self.transactions[txn.id] = txn
 
-    def remove_block_utxo(self, block: Block, utxo_set: Dict[str, Utxo] = None, transactions: Dict[str,Transaction] = None, 
-                own_utxo: Dict[str,Transaction] = None):
-        """Removes all the utxo created by block, and add utxo removed by the block when added to blockchain 
+        if block.coinbase_transaction.id not in self.transactions:
+            self.transactions[block.coinbase_transaction.id] = copy.deepcopy(block.coinbase_transaction)
+        
+    def remove_block(self, block:Block, pending_transactions:Dict[str,Transaction] = None):
+        """Add all transaction of block back to pending_transaction pool
+
         Args:
             block (Block): Block Object
-            utxo_set (Dict[str, Utxo], optional): utxo_set. Defaults to None.
-            transactions (Dict[str,Transaction], optional): transactions. Defaults to None.
+            pending_transactions (Dict[str,Transaction], optional): Pending transaction pool. Defaults to None.
+            current_block (Block, optional): last block of blockchain. Defaults to None.
         """
-        if utxo_set == None:
-            utxo_set = self.utxo_set
-        if transactions == None:
-            transactions = self.transactions
-        if own_utxo == None:
-            own_utxo = self.own_utxo
+        if pending_transactions == None: #if primary chain is being verified
+            pending_transactions = self.pending_transactions
+        # if current_block == None: #if primary chain is being verified
+        #     current_block = self.blockchain.current_block
 
-        for transaction in block.transactions:
-            self.remove_transaction(transaction,utxo_set, own_utxo)
-            transactions[transaction.id] = transaction
-        #Coinbase Transaction
-        del utxo_set[block.miner_utxo.id]
-        if block.miner_utxo.owner == self.id and block.miner_utxo.id in own_utxo:
-            del own_utxo[block.miner_utxo.id]
-
+        for txn in block.transactions:
+            pending_transactions[txn.id] = txn
+        
     def receive_block(self, block:Block):
-        if block.id in self.blockchain.blocks.keys() or block.parent_block_id not in self.blockchain.blocks.keys():
+        """Operation to be done when a block is received.
+
+        Args:
+            block (Block): Block Object
+
+        Returns:
+            bool: True if block is to be propogated. otherwise False.
+        """
+        if block.id in self.blockchain.blocks.keys():
             return False
 
+        if block.parent_block_id not in self.blockchain.blocks.keys():
+            if block.parent_block_id not in self.blockchain.cached_blocks:
+                self.blockchain.cached_blocks[block.parent_block_id] = block
+            return False
+        
+        if block.parent_block_id in self.blockchain.cached_blocks:
+            del self.blockchain.cached_blocks[block.parent_block_id]
+
         latest_block_position = self.blockchain.current_block.block_position
-        #TODO fork block verification will fail due to invalid utxo
         if block.parent_block_id != self.blockchain.current_block.id: # This will lead to fork, or extension of forked chain.
             #Since checkpointing is not implemented, fork and fork extension will be possible at any blocklength.
-            utxo_set,transactions,own_utxo = self.create_new_utxo_set(block) #create new utxo_set for the forked chain
-            if self.verify_block(block,utxo_set):
-                self.blockchain.add_block(
-                    parent_block_id = block.parent_block_id,
-                    child_block = block)
-                if(block.block_position == latest_block_position+1): #If the chain is being switched, utxo_set need to be updated    
-                    self.utxo_set = utxo_set
-                    self.transactions = transactions
-                    self.own_utxo = own_utxo
-                    self.execute_block_utxo(block)
-                return True
+            pending_transactions = self.create_new_pool(block) #create new pending transaction pool
+            if self.verify_block(block,pending_transactions,self.blockchain.blocks[block.parent_block_id]):
+                self.blockchain.add_block(child_block = block)
+                if(block.block_position == latest_block_position+1): #If the chain is being switched, pending transaction pool need to be updated    
+                    self.pending_transactions = pending_transactions
+                    self.execute_block(block)
             else:
                 return False
 
         elif block.block_position == latest_block_position+1:    # verify block, and add chain to the block.
             if self.verify_block(block):
-                self.blockchain.add_block(
-                    parent_block_id=block.parent_block_id,
-                    child_block=block
-                )
-                self.execute_block_utxo(block)
-                return True
+                self.blockchain.add_block(child_block=block)
+                self.execute_block(block)
             else:
                 return False
-        return False
+        #Return true if the block is added to the chain (not necessarily main chain)
+        return True
 
-    def create_new_utxo_set(self, block:Block):
-        """Creates a copy of utxo_set and pending transaction pool for the forked chain
+    def create_new_pool(self, block:Block):
+        """Creates a copy of pending transaction pool for the forked chain
 
         Args:
-            block (Block): Block Object
+            block (Block): block object
 
         Returns:
-            utxo_set: Dict[utxo_id, utxo]
-            txn_set: Dict[transactions_id, transaction]
+            pending_transactions Dict[str, Transaction]: pool of pending transactions for the forked chain
         """
-        utxo_set = copy.deepcopy(self.utxo_set)
-        txn_set = copy.deepcopy(self.transactions)
-        own_utxo = copy.deepcopy(self.own_utxo)
+        pending_transactions = copy.deepcopy(self.pending_transactions)
 
         block_oc = self.blockchain.current_block #original_block_chain
         length_oc = block_oc.block_position 
-        while length_oc >= block.block_position: #Removed all the utxo until the length of chain became equal.
-            self.remove_block_utxo(block_oc,utxo_set,txn_set,own_utxo)
+        while length_oc >= block.block_position: #Add all transaction in pending transactions until the length of chain becomes equal
+            self.remove_block(block_oc,pending_transactions)
         
             block_oc = self.blockchain.blocks[block_oc.parent_block_id]
             length_oc = block_oc.block_position
 
         block_nc = self.blockchain.blocks[block.parent_block_id] #new_block_chain
         block_to_be_added = []
-        while block_oc.id != block_nc.id: #Remove utxo until fork point
-            self.remove_block_utxo(block_oc,utxo_set,txn_set,own_utxo)
+        while block_oc.id != block_nc.id: #Add all transaction in pending transactions until fork point
+            self.remove_block(block_oc,pending_transactions)
             
             block_to_be_added.append(block_nc.id)
             block_oc = self.blockchain.blocks[block_oc.parent_block_id]
@@ -410,6 +310,6 @@ class Node:
 
         while block_to_be_added != []: #add utxo until chain is new chain is created
             block_add = self.blockchain.blocks[block_to_be_added.pop()]
-            self.execute_block_utxo(block_add,utxo_set,txn_set,own_utxo)
+            self.execute_block(block_add,pending_transactions)
         
-        return utxo_set, txn_set, own_utxo
+        return pending_transactions
