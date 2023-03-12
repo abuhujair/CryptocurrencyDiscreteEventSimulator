@@ -24,7 +24,7 @@ class Transaction:
         self.timestamp = timestamp
 
     def __str__(self) -> str:
-        output = f"\tTRANSACTION {self.id}Payer : {self.payer} Payee : {self.payee} Value : {self.value} Timestamp : {self.timestamp}\n"
+        output = f"\tTRANSACTION {self.id} Payer : {self.payer} Payee : {self.payee} Value : {self.value} Timestamp : {self.timestamp}\n"
         return output
 
 class Block:

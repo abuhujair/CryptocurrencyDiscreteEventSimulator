@@ -83,7 +83,7 @@ class Simulator:
                 file.write(str(node.blockchain))
 
         # Save blockchain visualizations
-        self.visualizer()
+        self.blockchainVisualizer()
 
     # ==========================================================================================
     # Peer network
@@ -234,54 +234,66 @@ class Simulator:
             for i in node.peers:
                 network_graph_edges.append((i, node.id))
                 if node.id in self.slow_nodes or i in self.slow_nodes:
-                    colormap_edges.append('#53565A')                    #Slow conection
+                    colormap_edges.append('#7F7F7F')                    #Slow conection
                 else:
-                    colormap_edges.append('#A1000E')                    #Fast Connection 
+                    colormap_edges.append('#7F0000')                    #Fast Connection 
         
         G = nx.DiGraph()
         G.add_nodes_from(network_graph_nodes)
         G.add_edges_from(network_graph_edges)
 
-        for i in network_graph_nodes:
+        if self.attack_type!= 0:
+            colormap_nodes.append("#FF0000")                            #Attacker Node
+        for i in range(0 if self.attack_type == 0 else 1, self.num_nodes):
             if(i in self.low_hash_p):
-                colormap_nodes.append('#00AEEF')
+                colormap_nodes.append('#0000FF')
             else:
-                colormap_nodes.append('#26D07C')
+                colormap_nodes.append('#00FF00')
 
         pos = nx.spring_layout(G)
         nx.draw(G, pos, node_color=colormap_nodes, edge_color=colormap_edges, with_labels=True)
-        plt.legend(["NODES: Blue:- Low Hash Power & Green:- High Hash Power", "EDGE: Red:- Fast connection & Gray:- Slow Connection"], loc='best')
+        if self.attack_type!=0:
+            plt.legend(["NODES: Blue:- Low Hash Power, Green:- High Hash Power, & Red:- Attacker", "EDGE: Red:- Fast connection & Gray:- Slow Connection"], loc='best')
+        else:
+            plt.legend(["NODES: Blue:- Low Hash Power & Green:- High Hash Power", "EDGE: Red:- Fast connection & Gray:- Slow Connection"], loc='best')
         plt.savefig(f"{settings.REPORT_DIR}/peer_network.png")
         self.logger.info("Peer network visualization saved")
 
-    def visualizer(self):
+    def blockchainVisualizer(self):
         """Visualize the final generated blockchain
         """
         blockchain_graph_nodes = []
         blockchain_graph_edges = []
 
-        for user in self.nodes.values(): 
-            for node in list(user.blockchain.blocks.values()):
-                blockchain_graph_nodes.append(node.id)
-                if node.parent_block_id == None:    # Genesis block
-                    continue
-                blockchain_graph_edges.append((node.id, node.parent_block_id))
-            nodes = {}
+        blocks = {}
+        blocks['Curr'] = 'L. Chain'
             
-            for i in range(len(blockchain_graph_nodes)):
-                nodes[blockchain_graph_nodes[i]]=i
-            G = graph.Digraph(f"{user.id}")
+        block_count = 0
+        for node in self.nodes.values(): 
+            for block in list(node.blockchain.blocks.values()):
+                blockchain_graph_nodes.append(block.id)
+                if block.id not in blocks:
+                    blocks[block.id] = block_count
+                    block_count+=1
+                if block.parent_block_id == None:    # Genesis block
+                    continue
+                blockchain_graph_edges.append((block.id, block.parent_block_id))
+
+            blockchain_graph_nodes.append('Curr')
+            blockchain_graph_edges.append(('Curr',node.blockchain.current_block.id))
+
+            G = graph.Digraph(f"{node.id}")
             G.attr(rankdir='LR',splines='line')
             
-            for i in blockchain_graph_nodes:
-                G.node(str(nodes[i]))
+            for block in blockchain_graph_nodes:
+                G.node(str(blocks[block]))
             
-            for i in blockchain_graph_edges:
-                G.edge(str(nodes[list(i)[0]]),str(nodes[list(i)[1]]))   
+            for edge in blockchain_graph_edges:
+                G.edge(str(blocks[list(edge)[0]]),str(blocks[list(edge)[1]]))   
             
-            G.render(f"{settings.NODES_DIR}/{user.id}_blockchain")  # Save blockchain images
+            G.render(f"{settings.NODES_DIR}/{node.id}_blockchain")  # Save blockchain images
             G.clear()
-            os.remove(f"{settings.NODES_DIR}/{user.id}_blockchain") # Remove metadata
+            os.remove(f"{settings.NODES_DIR}/{node.id}_blockchain") # Remove metadata
             blockchain_graph_edges.clear()
             blockchain_graph_nodes.clear()
 
@@ -296,7 +308,7 @@ class Simulator:
         """
         print("Simulation started.")
         current_time = 0
-        for period in range(int(simulation_time/20), int(simulation_time), int(simulation_time/20)):                
+        for period in range(int(simulation_time/20), int(simulation_time)+1, int(simulation_time/20)):                
             while current_time < period and self.event_queue != []:
                 event = heapq.heappop(self.event_queue)
                 current_time = event.time
