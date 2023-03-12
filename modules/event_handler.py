@@ -117,19 +117,16 @@ class EventHandler:
         elif event.type == 4:   # Mining end
             latest_block_number = event.node.blockchain.current_block.block_position
             block = event.extra_parameters['block']
-            if block.block_position == latest_block_number+1 and event.node.mine_block(block,event.time):
-                # Propagate the block
-                for peer_id in event.node.peers:
-                    message_length = (len(block.transactions) + 1)*0.008
-                    latency = event.node.get_latency(self.nodes[peer_id], message_length)
-                    
-                    self.add_event(Event(
-                        event_time=round(event.time + latency, 4),
-                        event_type=5,
-                        event_node=self.nodes[peer_id],
-                        block = copy.deepcopy(block),
-                        event_creator = event.node
-                    )) 
+            if (block.block_position == latest_block_number+1 and 
+                event.node.mine_block(block,event.time) ): 
+                if event.node.node_label == 0 :
+                    # Block to be propogated by only honest miner on creation
+                    # Propagate the block
+                    self.propogateBlock(event,block,event.node.id)
+
+                elif event.node.node_label == 1 or event.node.node_label == 2:
+                    # If node is not an honest miner, we will add the block to the queue.
+                    event.node.block_queue.append(block)
             
                 new_block = event.node.create_block()
                 self.add_event(Event(
@@ -140,37 +137,116 @@ class EventHandler:
                 ))
 
         elif event.type == 5:   # Receive block
-            block = event.extra_parameters['block']
-            event_creator_node = event.extra_parameters['event_creator']
-            flag = False
-            while event.node.receive_block(block):
-                # Propagate the block
+            if event.node.node_label == 0:
+                self.receiveBlockHonest(event)
+            elif event.node.node_label == 1:
+                self.receiveBlockSelfish(event)
+            elif event.node.node_label == 2:
+                self.receiveBlockStubborn(event)
+            
+    def receiveBlockHonest(self,event:Event):
+        block = event.extra_parameters['block']
+        event_creator_node = event.extra_parameters['event_creator']
+        flag = False
+        while event.node.receive_block(block):
+            # if the block is added to main chain, new block to be created:            
+            if block.id == event.node.blockchain.current_block.id:
                 flag = True
-                for peer_id in event.node.peers:
-                    if peer_id == event_creator_node:   # Circular dependency
-                        continue
+            # Propogate Block
+            self.propogateBlock(event,block,event_creator_node)
 
-                    message_length = (len(block.transactions) + 1)*0.008
-                    latency = event.node.get_latency(self.nodes[peer_id], message_length)
-                    
-                    self.add_event(Event(
-                        event_time=round(event.time + latency, 4),
-                        event_type=5,
-                        event_node=self.nodes[peer_id],
-                        block = copy.deepcopy(block),
-                        event_creator = event.node
-                    )) 
+            if block.id in event.node.blockchain.cached_blocks:
+                block = event.node.blockchain.cached_blocks[block.id]
+            else:
+                break
 
-                if block.id in event.node.blockchain.cached_blocks:
-                    block = event.node.blockchain.cached_blocks[block.id]
-                else:
-                    break
+        if flag:
+            new_block = event.node.create_block()
+            self.add_event(Event(
+                    event_time=round(event.time+self.gen_exp.exponential(self.iat_b/event.node.hash),4),
+                    event_type=4,
+                    event_node=event.node,
+                    block=new_block
+                ))
+            
+    def receiveBlockSelfish(self,event:Event):
+        block = event.extra_parameters['block']
+        event_creator_node = event.extra_parameters['event_creator']
+        flag = False
+        while event.node.receive_block(block):
+            # if the block is added to main chain, new block to be created and queue to be emptied:            
+            if block.id == event.node.blockchain.current_block.id:
+                flag = True
+                event.node.block_queue = []
 
-            if flag:
-                new_block = event.node.create_block()
-                self.add_event(Event(
-                        event_time=round(event.time+self.gen_exp.exponential(self.iat_b/event.node.hash),4),
-                        event_type=4,
-                        event_node=event.node,
-                        block=new_block
-                    ))
+            # if the lead is two, empty the chain
+            if (len(event.node.block_queue) == 2 and                    
+                event.node.block_queue[0].block_position <= block.block_position):
+                while len(event.node.block_queue):
+                    attacker_block = event.node.block_queue.pop(0)
+                    self.propogateBlock(event,attacker_block,event.node.id)
+
+            # If lead is 1 or more than 2, release a block.
+            elif ( len(event.node.block_queue) and
+                   event.node.block_queue[0].block_position <= block.block_position):
+                attacker_block = event.node.block_queue.pop(0)
+                self.propogateBlock(event,attacker_block,event.node.id)
+
+            if block.id in event.node.blockchain.cached_blocks:
+                block = event.node.blockchain.cached_blocks[block.id]
+            else:
+                break
+
+        if flag:
+            new_block = event.node.create_block()
+            self.add_event(Event(
+                    event_time=round(event.time+self.gen_exp.exponential(self.iat_b/event.node.hash),4),
+                    event_type=4,
+                    event_node=event.node,
+                    block=new_block
+                ))
+            
+    def receiveBlockStubborn(self,event:Event):
+        block = event.extra_parameters['block']
+        event_creator_node = event.extra_parameters['event_creator']
+        flag = False
+        while event.node.receive_block(block):
+            # if the block is added to main chain, new block to be created and queue to be emptied (queue will be empty though, theoretically):            
+            if block.id == event.node.blockchain.current_block.id:
+                flag = True
+                event.node.block_queue = []
+
+            # if the attacker has mined some block, it will release block whose position is equal to honest miners chain.
+            if ( len(event.node.block_queue) and
+                   event.node.block_queue[0].block_position == block.block_position):
+                attacker_block = event.node.block_queue.pop(0)
+                self.propogateBlock(event,attacker_block,event.node.id)
+
+            if block.id in event.node.blockchain.cached_blocks:
+                block = event.node.blockchain.cached_blocks[block.id]
+            else:
+                break
+
+        if flag:
+            new_block = event.node.create_block()
+            self.add_event(Event(
+                    event_time=round(event.time+self.gen_exp.exponential(self.iat_b/event.node.hash),4),
+                    event_type=4,
+                    event_node=event.node,
+                    block=new_block
+                ))
+
+    def propogateBlock(self,event:Event, block:Block,event_creator_node:int):
+        for peer_id in event.node.peers:
+            if peer_id == event_creator_node:   # Circular dependency
+                continue
+            message_length = (len(block.transactions) + 1)*0.008
+            latency = event.node.get_latency(self.nodes[peer_id], message_length)
+            
+            self.add_event(Event(
+                event_time=round(event.time + latency, 4),
+                event_type=5,
+                event_node=self.nodes[peer_id],
+                block = copy.deepcopy(block),
+                event_creator = event.node
+            )) 
