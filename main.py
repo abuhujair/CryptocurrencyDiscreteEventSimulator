@@ -43,9 +43,9 @@ if __name__ == '__main__':
         inter_arrival_time = 1.0,
         inter_arrival_time_block = 10.0,
         simulation_time = 200.0,
-        MAX_BLOCK_LENGTH = 500,
+        MAX_BLOCK_LENGTH = 1000,
         attack_type = 1,
-        adv_hash = 0.35,
+        adv_hash = 0.50,
         adv_connected = 0.50
     )
 

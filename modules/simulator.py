@@ -39,6 +39,7 @@ class Simulator:
         self.num_low_hash = int(num_nodes*low_hash)
         self.iat = inter_arrival_time
         self.iat_block = inter_arrival_time_block
+        self.simulation_time = simulation_time
         self.MAX_BLOCK_LENGTH = MAX_BLOCK_LENGTH
         self.attack_type = attack_type
         self.adv_hash = adv_hash
@@ -47,6 +48,8 @@ class Simulator:
         self.logger = get_logger("EVENT")
 
         self.gen_exp = np.random.default_rng()  # Exponential distribution generator
+        self.save_parameters()
+ 
         # Create peer network
         self.nodes = self.create_nodes()    # Dictionary [id: Node]
         self.create_network()   # Create edges between peers
@@ -75,7 +78,7 @@ class Simulator:
             self.event_handler.add_event(new_event)
 
         # Run the simulation
-        self.run_simulation(simulation_time=simulation_time)
+        self.run_simulation(simulation_time=self.simulation_time)
 
         # Save the results
         for node in list(self.nodes.values()):
@@ -294,6 +297,22 @@ class Simulator:
             os.remove(f"{settings.NODES_DIR}/{node.id}_blockchain") # Remove metadata
             blockchain_graph_edges.clear()
             blockchain_graph_nodes.clear()
+
+    def save_parameters(self):
+        output = ""
+        output += 'num_nodes = '+str(self.num_nodes)+',\n'
+        output += 'Slow_nodes = '+str(self.num_slow_nodes)+',\n'
+        output += 'low_hash = '+str(self.num_low_hash)+',\n'
+        output += 'inter_arrival_time = '+str(self.iat)+',\n'
+        output += 'inter_arrival_time_block = '+str(self.iat_block)+',\n'
+        output += 'simulation_time = '+str(self.simulation_time)+',\n'
+        output += 'MAX_BLOCK_LENGTH = '+str(self.MAX_BLOCK_LENGTH)+',\n'
+        output += 'attack_type = '+str(self.attack_type)+',\n'
+        output += 'adv_hash = '+str(self.adv_hash)+',\n'
+        output += 'adv_connected = '+str(self.adv_connected)+',\n'
+        with open(f"{settings.REPORT_DIR}/input_parameters.txt", "w") as file:
+            file.write(output)        
+
 
     # ==========================================================================================
     # Simulator functions
