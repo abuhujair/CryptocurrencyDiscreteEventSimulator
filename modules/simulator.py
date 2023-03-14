@@ -84,6 +84,7 @@ class Simulator:
         for node in list(self.nodes.values()):
             with open(f"{settings.NODES_DIR}/{node.id}_blockchain.txt", "w") as file:
                 file.write(str(node.blockchain))
+            self.save_blockchain_metric(node)
 
         # Save blockchain visualizations
         self.blockchainVisualizer()
@@ -272,7 +273,7 @@ class Simulator:
             for block in list(node.blockchain.blocks.values()):
                 blockchain_graph_nodes.append(block.id)
                 if block.id not in blocks:
-                    blocks[block.id] = 'ID- '+str(block_count)+',\nN- '+str(block.coinbase_transaction.payee)+',\nTS- '+str(block.timestamp)
+                    blocks[block.id] = 'ID- '+str(block_count)+',\nN- '+str(block.coinbase_transaction.payee)+',\nTS- '+str(block.timestamp)+',\nP- '+str(block.block_position)
                     block_count+=1
                 if block.parent_block_id == None:    # Genesis block
                     continue
@@ -315,6 +316,30 @@ class Simulator:
             file.write(output)        
         self.logger.info("Input parameter saved")
 
+    def save_blockchain_metric(self,node:Node):
+        chain_length = node.blockchain.current_block.block_position
+        total_blocks = len(node.blockchain.blocks)
+        output = ""
+        output += 'Chain Length: '+str(chain_length)+'\n'
+        output += 'Total Number of Blocks: '+str(total_blocks)+'\n'
+
+        if self.attack_type == 1 or self.attack_type == 2:
+            main_chain_attacker_block = 0
+            block = node.blockchain.current_block
+            while(block.parent_block_id != None):
+                if block.coinbase_transaction.payee==0:
+                    main_chain_attacker_block+=1
+                block = node.blockchain.blocks[block.parent_block_id]
+            total_attacker_block = 0
+            for block in node.blockchain.blocks.values():
+                if block.coinbase_transaction.payee==0:
+                    total_attacker_block+=1
+            output += 'Number of blocks mined by attacker: '+str(main_chain_attacker_block)+'\n'
+            output += 'Number of blocks mined by attacker in main chain: '+str(total_attacker_block)+'\n'
+
+        with open(f"{settings.NODES_DIR}/{node.id}_blockchain_metrics.txt", "w") as file:
+            file.write(output)        
+        self.logger.info("Blockchain metrics saved for: "+str(node.id))
 
     # ==========================================================================================
     # Simulator functions
