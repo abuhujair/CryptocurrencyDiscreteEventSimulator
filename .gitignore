@@ -7,7 +7,8 @@ archives
 
 # logs
 logs
-results
+results*
 test.png
 reports*
 .vscode
+tester*

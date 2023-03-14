@@ -297,6 +297,7 @@ class Simulator:
             os.remove(f"{settings.NODES_DIR}/{node.id}_blockchain") # Remove metadata
             blockchain_graph_edges.clear()
             blockchain_graph_nodes.clear()
+            self.logger.info("Blockchain saved for Node: "+str(node.id))
 
     def save_parameters(self):
         output = ""
@@ -312,6 +313,7 @@ class Simulator:
         output += 'adv_connected = '+str(self.adv_connected)+',\n'
         with open(f"{settings.REPORT_DIR}/input_parameters.txt", "w") as file:
             file.write(output)        
+        self.logger.info("Input parameter saved")
 
 
     # ==========================================================================================
