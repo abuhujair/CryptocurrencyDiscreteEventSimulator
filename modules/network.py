@@ -24,6 +24,7 @@ class Node:
         self.node_label = node_label # 0: Honest Miner, 1: Selfish Miner, 2: Stubborn Miner
         if self.node_label == 1 or self.node_label== 2:
             self.block_queue = list() # List[Block] of block pending to be transmitted by attacker
+            self.leadzerodash = False
 
         self.type = node_type
         self.MAX_BLOCK_LENGTH = MAX_BLOCK_LENGTH

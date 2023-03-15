@@ -124,10 +124,20 @@ class EventHandler:
                     # Propagate the block
                     self.propogateBlock(event,block,event.node.id)
 
-                elif event.node.node_label == 1 or event.node.node_label == 2:
-                    # If node is not an honest miner, we will add the block to the queue.
-                    event.node.block_queue.append(block)
+                # Selfish miner
+                elif event.node.node_label == 1:
+                    # If in zerodash state propogate the block, else add the block in private chain
+                    if event.node.leadzerodash :
+                        self.propogateBlock(event,block,event.node.id)
+                        event.node.leadzerodash = False
+                    else :
+                        event.node.block_queue.append(block)
             
+                # Stubborn miner
+                elif event.node.node_label == 2:
+                    # Add block to private chain
+                    event.node.block_queue.append(block)
+
                 new_block = event.node.create_block()
                 self.add_event(Event(
                     event_time=round(event.time+self.gen_exp.exponential(self.iat_b/event.node.hash),4),
@@ -175,19 +185,28 @@ class EventHandler:
         event_creator_node = event.extra_parameters['event_creator']
         flag = False
         while event.node.receive_block(block):
-            # if the block is added to main chain, new block to be created and queue to be emptied:            
+            # if the block is added to main chain, new block to be created and queue to be emptied
+            # This will lead to state 0.            
             if block.id == event.node.blockchain.current_block.id:
                 flag = True
+                event.node.leadzerodash = False
                 event.node.block_queue = []
 
-            # if the lead is two, empty the chain
-            if (len(event.node.block_queue) == 2 and                    
+            # If the lead is one, empty the chain and move to 0' state.
+            if (len(event.node.block_queue) == 1 and                    
+                event.node.block_queue[0].block_position == block.block_position):
+                attacker_block = event.node.block_queue.pop(0)
+                self.propogateBlock(event,attacker_block,event.node.id)
+                event.node.leadzerodash = True
+
+            # if the lead is two, empty the chain, will move to state 0.
+            elif (len(event.node.block_queue) == 2 and                    
                 event.node.block_queue[0].block_position == block.block_position):
                 while len(event.node.block_queue):
                     attacker_block = event.node.block_queue.pop(0)
                     self.propogateBlock(event,attacker_block,event.node.id)
 
-            # If lead is 1 or more than 2, release a block.
+            # If lead is more than 2, release a block. Will move to state k-1, where k is lead.
             elif ( len(event.node.block_queue) and
                    event.node.block_queue[0].block_position == block.block_position):
                 attacker_block = event.node.block_queue.pop(0)
