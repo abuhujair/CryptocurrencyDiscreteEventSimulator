@@ -323,6 +323,24 @@ class Simulator:
         output += 'Chain Length: '+str(chain_length)+'\n'
         output += 'Total Number of Blocks: '+str(total_blocks)+'\n'
 
+        block_details = dict()
+
+        for block in node.blockchain.blocks.values():
+            if block.coinbase_transaction.payee in block_details:
+                block_details[block.coinbase_transaction.payee]+=1
+            else:
+                block_details[block.coinbase_transaction.payee] =1
+
+        output+='\n'
+
+        for key in sorted(block_details.keys()):
+            if key == -1:
+                continue
+            output+="Number of blocks of Node "+str(key)+": "+str(block_details[key])
+            output+=", Node Type: "+str(self.nodes[key].type)
+            output+=", Node Hash: "+str(self.nodes[key].hash)+'\n'
+        output+='\n'
+
         if self.attack_type == 1 or self.attack_type == 2:
             main_chain_attacker_block = 0
             block = node.blockchain.current_block
@@ -330,12 +348,18 @@ class Simulator:
                 if block.coinbase_transaction.payee==0:
                     main_chain_attacker_block+=1
                 block = node.blockchain.blocks[block.parent_block_id]
-            total_attacker_block = 0
-            for block in node.blockchain.blocks.values():
-                if block.coinbase_transaction.payee==0:
-                    total_attacker_block+=1
-            output += 'Number of blocks mined by attacker: '+str(main_chain_attacker_block)+'\n'
-            output += 'Number of blocks mined by attacker in main chain: '+str(total_attacker_block)+'\n'
+            output += 'Number of blocks mined by attacker in main chain: '+str(main_chain_attacker_block)+'\n'
+            output += 'Number of blocks mined by attacker: '+str(block_details[0] if 0 in block_details else 0)+'\n'
+            if node.node_label == 1 or node.node_label == 2:
+                fast_connection = 0
+                slow_connection = 0
+                for peer in node.peers:
+                    if self.nodes[peer].type == 0:
+                        slow_connection +=1
+                    else:
+                        fast_connection +=1
+                output += 'Number of fast connections of attacker: '+str(fast_connection)+'\n'
+                output += 'Number of slow connections of attacker: '+str(slow_connection)+'\n'
 
         with open(f"{settings.NODES_DIR}/{node.id}_blockchain_metrics.txt", "w") as file:
             file.write(output)        
@@ -359,3 +383,4 @@ class Simulator:
                 current_time = event.time
                 self.event_handler.handle_event(event)
             print("Simulation completed for: "+str(current_time)+"s")
+            self.logger.info("Simulation completed for: "+str(current_time)+"s")
