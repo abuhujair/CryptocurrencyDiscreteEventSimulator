@@ -81,7 +81,7 @@ class EventHandler:
 
             # Create event for next transaction generation
             self.add_event(Event(
-                event_time=round(event.time + max(0.0001,self.gen_exp.exponential(self.iat))),
+                event_time=round(event.time + max(0.0001,self.gen_exp.exponential(self.iat)),4),
                 event_type=1,
                 event_node=event.node,
             ))
