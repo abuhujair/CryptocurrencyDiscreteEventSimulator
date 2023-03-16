@@ -45,8 +45,8 @@ class Block:
         for transaction in transactions:
             transaction_str += str(transaction.id) + " "
 
-        self.id = hashlib.sha256(f"{timestamp}-{transaction_str}".encode()).hexdigest()
-        self.timestamp = timestamp
+        self.id = hashlib.sha256(f"{parent_block_id}-{block_position}-{timestamp}-{transaction_str}-{block_creator}".encode()).hexdigest()
+        self.timestamp = -1
         self.transactions = transactions
 
         self.parent_block_id = parent_block_id

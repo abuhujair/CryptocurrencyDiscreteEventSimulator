@@ -46,8 +46,8 @@ class Simulator:
         self.adv_connected = adv_connected
 
         self.logger = get_logger("EVENT")
-
         self.gen_exp = np.random.default_rng()  # Exponential distribution generator
+        
         self.save_parameters()
  
         # Create peer network
@@ -88,6 +88,9 @@ class Simulator:
 
         # Save blockchain visualizations
         self.blockchainVisualizer()
+        print("Simulation ended successfully.")
+        self.logger.info("Simulation ended successfully.")
+        
 
     # ==========================================================================================
     # Peer network
@@ -317,7 +320,7 @@ class Simulator:
         self.logger.info("Input parameter saved")
 
     def save_blockchain_metric(self,node:Node):
-        chain_length = node.blockchain.current_block.block_position
+        chain_length = node.blockchain.current_block.block_position+1
         total_blocks = len(node.blockchain.blocks)
         output = ""
         output += 'Chain Length: '+str(chain_length)+'\n'
@@ -331,15 +334,13 @@ class Simulator:
             else:
                 block_details[block.coinbase_transaction.payee] =1
 
-        output+='\n'
-
+        extra = ''
         for key in sorted(block_details.keys()):
             if key == -1:
                 continue
-            output+="Number of blocks of Node "+str(key)+": "+str(block_details[key])
-            output+=", Node Type: "+str(self.nodes[key].type)
-            output+=", Node Hash: "+str(self.nodes[key].hash)+'\n'
-        output+='\n'
+            extra+="Number of blocks of Node "+str(key)+": "+str(block_details[key])
+            extra+=", Node Type: "+str(self.nodes[key].type)
+            extra+=", Node Hash: "+str(self.nodes[key].hash)+'\n'
 
         if self.attack_type == 1 or self.attack_type == 2:
             main_chain_attacker_block = 0
@@ -348,8 +349,11 @@ class Simulator:
                 if block.coinbase_transaction.payee==0:
                     main_chain_attacker_block+=1
                 block = node.blockchain.blocks[block.parent_block_id]
+                total_attacker_block = block_details[0] if 0 in block_details else 0
             output += 'Number of blocks mined by attacker in main chain: '+str(main_chain_attacker_block)+'\n'
-            output += 'Number of blocks mined by attacker: '+str(block_details[0] if 0 in block_details else 0)+'\n'
+            output += 'Number of blocks mined by attacker: '+str(total_attacker_block)+'\n'
+            output += 'MPUnode(adv): '+str(float(main_chain_attacker_block)/float(total_attacker_block))+'\n'
+            output += 'MPUnode(overall): '+str(float(chain_length)/float(total_blocks))+'\n'
             if node.node_label == 1 or node.node_label == 2:
                 fast_connection = 0
                 slow_connection = 0
@@ -360,6 +364,9 @@ class Simulator:
                         fast_connection +=1
                 output += 'Number of fast connections of attacker: '+str(fast_connection)+'\n'
                 output += 'Number of slow connections of attacker: '+str(slow_connection)+'\n'
+
+        output+='\n'
+        output+=extra
 
         with open(f"{settings.NODES_DIR}/{node.id}_blockchain_metrics.txt", "w") as file:
             file.write(output)        

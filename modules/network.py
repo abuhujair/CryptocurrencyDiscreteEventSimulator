@@ -135,7 +135,7 @@ class Node:
             return True
         return False
 
-    def create_block(self):
+    def create_block(self, timestamp: float):
         """Create block for mining
 
         Returns:
@@ -158,7 +158,7 @@ class Node:
         block = Block(
             parent_block_id=self.blockchain.current_block.id,
             block_position=self.blockchain.current_block.block_position + 1,
-            timestamp=-1,
+            timestamp=timestamp,
             transactions=txns,
             block_creator=self.id,
             account_balance=account_balance
@@ -185,7 +185,7 @@ class Node:
         sum_outgoing = [0]*len(current_account_balance)
         txns = dict() #Dict[str,Transaction]
         for transaction in block.transactions:
-            if transaction not in txns and (transaction.id in pending_transactions 
+            if transaction.id not in txns and (transaction.id in pending_transactions 
                 or transaction.id not in self.transactions):
                 txns[transaction.id] = transaction
                 sum_outgoing[transaction.payer] -= transaction.value
@@ -248,10 +248,10 @@ class Node:
         Returns:
             bool: True if block is to be propogated. otherwise False.
         """
-        if block.id in self.blockchain.blocks.keys():
+        if block.id in self.blockchain.blocks:
             return False
 
-        if block.parent_block_id not in self.blockchain.blocks.keys():
+        if block.parent_block_id not in self.blockchain.blocks:
             if block.parent_block_id not in self.blockchain.cached_blocks:
                 self.blockchain.cached_blocks[block.parent_block_id] = block
             return False
