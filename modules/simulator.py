@@ -283,6 +283,12 @@ class Simulator:
                 blockchain_graph_edges.append((block.id, block.parent_block_id))
 
             blockchain_graph_nodes.sort()
+
+            if node.node_label == 1 or node.node_label ==2:
+                blocks['PrivateBlocks'] = 'Private\nBlocks'
+                blockchain_graph_nodes.append('PrivateBlocks')
+                if len(node.block_queue):
+                    blockchain_graph_edges.append(('PrivateBlocks',node.block_queue[0].id))
             
             blockchain_graph_nodes.append('Curr')
             blockchain_graph_edges.append(('Curr',node.blockchain.current_block.id))
