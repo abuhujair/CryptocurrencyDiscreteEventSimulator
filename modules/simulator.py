@@ -19,7 +19,7 @@ class Simulator:
     """
     def __init__(self, num_nodes:int , slow_nodes:float, low_hash:float, inter_arrival_time:float,
                     inter_arrival_time_block:float , simulation_time:float, MAX_BLOCK_LENGTH: int, 
-                    attack_type:int, adv_hash:float, adv_connected:float):
+                    attack_type:int=0, adv_hash:float=0.0, adv_connected:float=0.0):
         """Initialize node, network and simulator parameters
 
         Args:
@@ -30,19 +30,26 @@ class Simulator:
             inter_arrival_time_block (float): Inter-arrival time between blocks
             simulation_time (float): Simulation time 
             MAX_BLOCK_LENGTH (int): Max number of transactions in a block
+            attack_type (int): Default 0. 1 for Selfish Mining, 2 for Stubborn Mining
+            adv_hash (float): Default 0. Hashing power of attacker.
+            adv_connected (float): Default 0, Percentage of node adversary is connected to.
         """
         self.num_nodes = num_nodes
         self.num_slow_nodes = int(num_nodes*slow_nodes)
         self.num_low_hash = int(num_nodes*low_hash)
         self.iat = inter_arrival_time
         self.iat_block = inter_arrival_time_block
+        self.simulation_time = simulation_time
         self.MAX_BLOCK_LENGTH = MAX_BLOCK_LENGTH
         self.attack_type = attack_type
         self.adv_hash = adv_hash
         self.adv_connected = adv_connected
-        self.logger = get_logger("EVENT")
 
+        self.logger = get_logger("EVENT")
         self.gen_exp = np.random.default_rng()  # Exponential distribution generator
+        
+        self.save_parameters()
+ 
         # Create peer network
         self.nodes = self.create_nodes()    # Dictionary [id: Node]
         self.create_network()   # Create edges between peers
@@ -50,7 +57,7 @@ class Simulator:
         self.networkVisualizer()    # Visulaize the peer network
         
         self.event_queue = list()   # Priority queue of event queue [Event]
-        self.event_handler = EventHandler(self.event_queue, self.nodes, self.iat, self.iat_block)
+        self.event_handler = EventHandler(self.event_queue, self.nodes, self.iat, self.iat_block, self.logger)
     
         # Initialize first transaction events
         for node in self.nodes.values():
@@ -71,15 +78,19 @@ class Simulator:
             self.event_handler.add_event(new_event)
 
         # Run the simulation
-        self.run_simulation(simulation_time=simulation_time)
+        self.run_simulation(simulation_time=self.simulation_time)
 
         # Save the results
         for node in list(self.nodes.values()):
             with open(f"{settings.NODES_DIR}/{node.id}_blockchain.txt", "w") as file:
                 file.write(str(node.blockchain))
+            self.save_blockchain_metric(node)
 
         # Save blockchain visualizations
-        self.visualizer()
+        self.blockchainVisualizer()
+        print("Simulation ended successfully.")
+        self.logger.info("Simulation ended successfully.")
+        
 
     # ==========================================================================================
     # Peer network
@@ -117,57 +128,57 @@ class Simulator:
         nodes = {}
         hash_power = (1 - self.adv_hash)/(10*(self.num_nodes-1) - 9*self.num_low_hash)
 
-        self.slow_nodes = random.sample(range(1 , self.num_nodes), self.num_slow_nodes)     # Slow nodes
-        self.low_hash_p = random.sample(range(1 , self.num_nodes), self.num_low_hash)   # Low hashing power nodes
+        self.slow_nodes = random.sample(range(1 if self.attack_type!=0 else 0 , self.num_nodes), self.num_slow_nodes)     # Slow nodes
+        self.low_hash_p = random.sample(range(1 if self.attack_type!=0 else 0 , self.num_nodes), self.num_low_hash)   # Low hashing power nodes
+        if self.attack_type!=0:
+            nodes[0] = Node(node_id=0,
+                            node_type=1,
+                            genesis_block=copy.deepcopy(genesis_block),
+                            hash=self.adv_hash,
+                            MAX_BLOCK_LENGTH=self.MAX_BLOCK_LENGTH,
+                            node_label=self.attack_type
+                            )
+            nodes[0].num_peers = int(self.adv_connected*self.num_nodes)
 
-        nodes[0] = Node(node_id=0,
-                        node_type=1,
-                        #node_label=self.attack_type,
-                        genesis_block=copy.deepcopy(genesis_block),
-                        hash=self.adv_hash,
-                        MAX_BLOCK_LENGTH=self.MAX_BLOCK_LENGTH)
-        nodes[0].num_peers = int(self.adv_connected*self.num_nodes)
-
-        for i in range(1, self.num_nodes):
+        for i in range(1 if self.attack_type!=0 else 0, self.num_nodes):
             if (i in self.slow_nodes) and (i in self.low_hash_p):
                 nodes[i] = Node(node_id=i,
                                 node_type=0,
-                                #node_label=0,
                                 genesis_block=copy.deepcopy(genesis_block),
                                 hash=hash_power,
-                                MAX_BLOCK_LENGTH=self.MAX_BLOCK_LENGTH)
+                                MAX_BLOCK_LENGTH=self.MAX_BLOCK_LENGTH,
+                                )
             
             elif i in self.slow_nodes:
                 nodes[i] = Node(node_id=i,
                                 node_type=0,
-                                #node_label=0,
                                 genesis_block=copy.deepcopy(genesis_block),
                                 hash=hash_power*10,
-                                MAX_BLOCK_LENGTH=self.MAX_BLOCK_LENGTH)
+                                MAX_BLOCK_LENGTH=self.MAX_BLOCK_LENGTH,
+                                )
 
             elif i in self.low_hash_p:
                 nodes[i] = Node(node_id=i,
                                 node_type=1,
-                                #node_label=0,
                                 genesis_block=copy.deepcopy(genesis_block),
                                 hash=hash_power,
-                                MAX_BLOCK_LENGTH=self.MAX_BLOCK_LENGTH)
+                                MAX_BLOCK_LENGTH=self.MAX_BLOCK_LENGTH,
+                                )
             
             else:
                 nodes[i] = Node(node_id=i,
                                 node_type=1,
-                                #node_label=0,
                                 genesis_block=copy.deepcopy(genesis_block),
                                 hash=hash_power*10,
-                                MAX_BLOCK_LENGTH=self.MAX_BLOCK_LENGTH)
-
+                                MAX_BLOCK_LENGTH=self.MAX_BLOCK_LENGTH,
+                                )
         self.logger.info("Peer nodes created successfully")
         return nodes
 
     def create_network(self):
         """Create interconnections between peer nodes in the network. 
-        """
-        while True:
+        """            
+        while True:                        
             for node in self.nodes.values():
                 for rand_peer in random.sample(list(self.nodes.values()), self.num_nodes):
                     if len(node.peers) == node.num_peers:   # Max peers attached
@@ -226,56 +237,146 @@ class Simulator:
             for i in node.peers:
                 network_graph_edges.append((i, node.id))
                 if node.id in self.slow_nodes or i in self.slow_nodes:
-                    colormap_edges.append('#53565A')                    #Slow conection
+                    colormap_edges.append('#7F7F7F')                    #Slow conection
                 else:
-                    colormap_edges.append('#A1000E')                    #Fast Connection 
+                    colormap_edges.append('#7F0000')                    #Fast Connection 
         
         G = nx.DiGraph()
         G.add_nodes_from(network_graph_nodes)
         G.add_edges_from(network_graph_edges)
 
-        for i in network_graph_nodes:
+        if self.attack_type!= 0:
+            colormap_nodes.append("#FF0000")                            #Attacker Node
+        for i in range(0 if self.attack_type == 0 else 1, self.num_nodes):
             if(i in self.low_hash_p):
-                colormap_nodes.append('#00AEEF')
+                colormap_nodes.append('#0000FF')
             else:
-                colormap_nodes.append('#26D07C')
+                colormap_nodes.append('#00FF00')
 
         pos = nx.spring_layout(G)
         nx.draw(G, pos, node_color=colormap_nodes, edge_color=colormap_edges, with_labels=True)
-        plt.legend(["NODES: Blue:- Low Hash Power & Green:- High Hash Power", "EDGE: Red:- Fast connection & Gray:- Slow Connection"], loc='best')
+        if self.attack_type!=0:
+            plt.legend(["NODES: Blue:- Low Hash Power, Green:- High Hash Power, & Red:- Attacker", "EDGE: Red:- Fast connection & Gray:- Slow Connection"], loc='best')
+        else:
+            plt.legend(["NODES: Blue:- Low Hash Power & Green:- High Hash Power", "EDGE: Red:- Fast connection & Gray:- Slow Connection"], loc='best')
         plt.savefig(f"{settings.REPORT_DIR}/peer_network.png")
         self.logger.info("Peer network visualization saved")
 
-    def visualizer(self):
+    def blockchainVisualizer(self):
         """Visualize the final generated blockchain
         """
         blockchain_graph_nodes = []
         blockchain_graph_edges = []
 
-        for user in self.nodes.values(): 
-            for node in list(user.blockchain.blocks.values()):
-                blockchain_graph_nodes.append(node.id)
-                if node.parent_block_id == None:    # Genesis block
-                    continue
-                blockchain_graph_edges.append((node.id, node.parent_block_id))
-            nodes = {}
+        blocks = {}
+        blocks['Curr'] = 'Longest\nChain'
             
-            for i in range(len(blockchain_graph_nodes)):
-                nodes[blockchain_graph_nodes[i]]=i
-            G = graph.Digraph(f"{user.id}")
+        block_count = 0
+        for node in self.nodes.values(): 
+            for block in list(node.blockchain.blocks.values()):
+                blockchain_graph_nodes.append(block.id)
+                if block.id not in blocks:
+                    blocks[block.id] = 'ID- '+str(block_count)+',\nN- '+str(block.coinbase_transaction.payee)+',\nTS- '+str(block.timestamp)+',\nP- '+str(block.block_position)
+                    block_count+=1
+                if block.parent_block_id == None:    # Genesis block
+                    continue
+                blockchain_graph_edges.append((block.id, block.parent_block_id))
+
+            blockchain_graph_nodes.sort()
+
+            if node.node_label == 1 or node.node_label ==2:
+                blocks['PrivateBlocks'] = 'Private\nBlocks'
+                blockchain_graph_nodes.append('PrivateBlocks')
+                if len(node.block_queue):
+                    blockchain_graph_edges.append(('PrivateBlocks',node.block_queue[0].id))
+            
+            blockchain_graph_nodes.append('Curr')
+            blockchain_graph_edges.append(('Curr',node.blockchain.current_block.id))
+
+            G = graph.Digraph(f"{node.id}")
             G.attr(rankdir='LR',splines='line')
             
-            for i in blockchain_graph_nodes:
-                G.node(str(nodes[i]))
+            for block in blockchain_graph_nodes:
+                G.node(str(blocks[block]))
             
-            for i in blockchain_graph_edges:
-                G.edge(str(nodes[list(i)[0]]),str(nodes[list(i)[1]]))   
+            for edge in blockchain_graph_edges:
+                G.edge(str(blocks[list(edge)[0]]),str(blocks[list(edge)[1]]))   
             
-            G.render(f"{settings.NODES_DIR}/{user.id}_blockchain")  # Save blockchain images
+            G.render(f"{settings.NODES_DIR}/{node.id}_blockchain")  # Save blockchain images
             G.clear()
-            os.remove(f"{settings.NODES_DIR}/{user.id}_blockchain") # Remove metadata
+            os.remove(f"{settings.NODES_DIR}/{node.id}_blockchain") # Remove metadata
             blockchain_graph_edges.clear()
             blockchain_graph_nodes.clear()
+            self.logger.info("Blockchain saved for Node: "+str(node.id))
+
+    def save_parameters(self):
+        output = ""
+        output += 'num_nodes = '+str(self.num_nodes)+',\n'
+        output += 'Slow_nodes = '+str(self.num_slow_nodes)+',\n'
+        output += 'low_hash = '+str(self.num_low_hash)+',\n'
+        output += 'inter_arrival_time = '+str(self.iat)+',\n'
+        output += 'inter_arrival_time_block = '+str(self.iat_block)+',\n'
+        output += 'simulation_time = '+str(self.simulation_time)+',\n'
+        output += 'MAX_BLOCK_LENGTH = '+str(self.MAX_BLOCK_LENGTH)+',\n'
+        output += 'attack_type = '+str(self.attack_type)+',\n'
+        output += 'adv_hash = '+str(self.adv_hash)+',\n'
+        output += 'adv_connected = '+str(self.adv_connected)+',\n'
+        with open(f"{settings.REPORT_DIR}/input_parameters.txt", "w") as file:
+            file.write(output)        
+        self.logger.info("Input parameter saved")
+
+    def save_blockchain_metric(self,node:Node):
+        chain_length = node.blockchain.current_block.block_position+1
+        total_blocks = len(node.blockchain.blocks)
+        output = ""
+        output += 'Chain Length: '+str(chain_length)+'\n'
+        output += 'Total Number of Blocks: '+str(total_blocks)+'\n'
+
+        block_details = dict()
+
+        for block in node.blockchain.blocks.values():
+            if block.coinbase_transaction.payee in block_details:
+                block_details[block.coinbase_transaction.payee]+=1
+            else:
+                block_details[block.coinbase_transaction.payee] =1
+
+        extra = ''
+        for key in sorted(block_details.keys()):
+            if key == -1:
+                continue
+            extra+="Number of blocks of Node "+str(key)+": "+str(block_details[key])
+            extra+=", Node Type: "+str(self.nodes[key].type)
+            extra+=", Node Hash: "+str(self.nodes[key].hash)+'\n'
+
+        if self.attack_type == 1 or self.attack_type == 2:
+            main_chain_attacker_block = 0
+            block = node.blockchain.current_block
+            while(block.parent_block_id != None):
+                if block.coinbase_transaction.payee==0:
+                    main_chain_attacker_block+=1
+                block = node.blockchain.blocks[block.parent_block_id]
+                total_attacker_block = block_details[0] if 0 in block_details else 0
+            output += 'Number of blocks mined by attacker in main chain: '+str(main_chain_attacker_block)+'\n'
+            output += 'Number of blocks mined by attacker: '+str(total_attacker_block)+'\n'
+            output += 'MPUnode(adv): '+str(float(main_chain_attacker_block)/float(total_attacker_block))+'\n'
+            output += 'MPUnode(overall): '+str(float(chain_length)/float(total_blocks))+'\n'
+            if node.node_label == 1 or node.node_label == 2:
+                fast_connection = 0
+                slow_connection = 0
+                for peer in node.peers:
+                    if self.nodes[peer].type == 0:
+                        slow_connection +=1
+                    else:
+                        fast_connection +=1
+                output += 'Number of fast connections of attacker: '+str(fast_connection)+'\n'
+                output += 'Number of slow connections of attacker: '+str(slow_connection)+'\n'
+
+        output+='\n'
+        output+=extra
+
+        with open(f"{settings.NODES_DIR}/{node.id}_blockchain_metrics.txt", "w") as file:
+            file.write(output)        
+        self.logger.info("Blockchain metrics saved for: "+str(node.id))
 
     # ==========================================================================================
     # Simulator functions
@@ -286,8 +387,13 @@ class Simulator:
         Args:
             simulation_time (float): Simulation time
         """
+        print("Simulation started.")
         current_time = 0
-        while current_time < simulation_time and self.event_queue != []:
-            event = heapq.heappop(self.event_queue)
-            current_time = event.time
-            self.event_handler.handle_event(event)
+        period = int(simulation_time/20) if simulation_time>20 else 1
+        for period in range(period, int(simulation_time)+1, period):                
+            while current_time < period and self.event_queue != []:
+                event = heapq.heappop(self.event_queue)
+                current_time = event.time
+                self.event_handler.handle_event(event)
+            print("Simulation completed for: "+str(current_time)+"s")
+            self.logger.info("Simulation completed for: "+str(current_time)+"s")

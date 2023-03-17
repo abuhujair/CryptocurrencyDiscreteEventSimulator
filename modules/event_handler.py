@@ -42,11 +42,11 @@ class Event:
 class EventHandler:
     """Event handler instance of the simulator
     """
-    def __init__(self, event_queue:List[Event], nodes:Dict[int, Node], iat:float, iat_b:float) -> None:
+    def __init__(self, event_queue:List[Event], nodes:Dict[int, Node], iat:float, iat_b:float, logger) -> None:
         self.event_queue = event_queue   # Priority list for events
         self.nodes = nodes
         self.gen_exp = np.random.default_rng()
-        self.logger = get_logger("EVENT")
+        self.logger = logger
         self.iat = iat
         self.iat_b = iat_b
     
@@ -59,8 +59,7 @@ class EventHandler:
         heapq.heappush(self.event_queue, event)
 
     def handle_event(self,  event:Event):
-        self.logger.info(event)
-
+        # self.logger.info(event)
         if event.type == 1: # Create transaction
             while True:
                 payee = random.randint(0,len(self.nodes)-1)
@@ -82,7 +81,7 @@ class EventHandler:
 
             # Create event for next transaction generation
             self.add_event(Event(
-                event_time=round(self.gen_exp.exponential(self.iat)) + event.time,
+                event_time=round(event.time + max(0.0001,self.gen_exp.exponential(self.iat)),4),
                 event_type=1,
                 event_node=event.node,
             ))
@@ -106,9 +105,9 @@ class EventHandler:
                     )) 
 
         elif event.type == 3:   # Mining Start
-            new_block = event.node.create_block()
+            new_block = event.node.create_block(event.time)
             self.add_event(Event(
-                event_time=round(event.time+self.gen_exp.exponential(self.iat_b/event.node.hash),4),
+                event_time=round(event.time+max(0.0001,self.gen_exp.exponential(self.iat_b/event.node.hash)),4),
                 event_type=4,
                 event_node=event.node,
                 block=new_block
@@ -124,11 +123,21 @@ class EventHandler:
                     # Propagate the block
                     self.propogateBlock(event,block,event.node.id)
 
-                elif event.node.node_label == 1 or event.node.node_label == 2:
-                    # If node is not an honest miner, we will add the block to the queue.
-                    event.node.block_queue.append(block)
+                # Selfish miner
+                elif event.node.node_label == 1:
+                    # If in zerodash state propogate the block, else add the block in private chain
+                    if event.node.leadzerodash :
+                        self.propogateBlock(event,block,event.node.id)
+                        event.node.leadzerodash = False
+                    else :
+                        event.node.block_queue.append(block)
             
-                new_block = event.node.create_block()
+                # Stubborn miner
+                elif event.node.node_label == 2:
+                    # Add block to private chain
+                    event.node.block_queue.append(block)
+
+                new_block = event.node.create_block(event.time)
                 self.add_event(Event(
                     event_time=round(event.time+self.gen_exp.exponential(self.iat_b/event.node.hash),4),
                     event_type=4,
@@ -138,11 +147,20 @@ class EventHandler:
 
         elif event.type == 5:   # Receive block
             if event.node.node_label == 0:
-                self.receiveBlockHonest(event)
+                flag = self.receiveBlockHonest(event)
             elif event.node.node_label == 1:
-                self.receiveBlockSelfish(event)
+                flag = self.receiveBlockSelfish(event)
             elif event.node.node_label == 2:
-                self.receiveBlockStubborn(event)
+                flag = self.receiveBlockStubborn(event)
+
+            if flag:
+                new_block = event.node.create_block(event.time)
+                self.add_event(Event(
+                        event_time=round(event.time+self.gen_exp.exponential(self.iat_b/event.node.hash),4),
+                        event_type=4,
+                        event_node=event.node,
+                        block=new_block
+                    ))
             
     def receiveBlockHonest(self,event:Event):
         block = event.extra_parameters['block']
@@ -155,56 +173,53 @@ class EventHandler:
             # Propogate Block
             self.propogateBlock(event,block,event_creator_node)
 
+            # If there are any cached block with received block as block id, verify and add them in blockchain
             if block.id in event.node.blockchain.cached_blocks:
                 block = event.node.blockchain.cached_blocks[block.id]
             else:
                 break
 
-        if flag:
-            new_block = event.node.create_block()
-            self.add_event(Event(
-                    event_time=round(event.time+self.gen_exp.exponential(self.iat_b/event.node.hash),4),
-                    event_type=4,
-                    event_node=event.node,
-                    block=new_block
-                ))
+        return flag
             
     def receiveBlockSelfish(self,event:Event):
         block = event.extra_parameters['block']
         event_creator_node = event.extra_parameters['event_creator']
         flag = False
         while event.node.receive_block(block):
-            # if the block is added to main chain, new block to be created and queue to be emptied:            
+            # if the block is added to main chain, new block to be created and queue to be emptied
+            # This will lead to state 0.
             if block.id == event.node.blockchain.current_block.id:
                 flag = True
-                event.node.block_queue = []
+                event.node.leadzerodash = False
+                # event.node.block_queue = []
 
-            # if the lead is two, empty the chain
-            if (len(event.node.block_queue) == 2 and                    
-                event.node.block_queue[0].block_position <= block.block_position):
+            # If the lead is one, empty the chain and move to 0' state.
+            elif (len(event.node.block_queue) == 1 and                    
+                event.node.block_queue[0].block_position == block.block_position):
+                attacker_block = event.node.block_queue.pop(0)
+                self.propogateBlock(event,attacker_block,event.node.id)
+                event.node.leadzerodash = True
+
+            # if the lead is two, empty the chain, will move to state 0.
+            elif (len(event.node.block_queue) == 2 and                    
+                event.node.block_queue[0].block_position == block.block_position):
                 while len(event.node.block_queue):
                     attacker_block = event.node.block_queue.pop(0)
                     self.propogateBlock(event,attacker_block,event.node.id)
 
-            # If lead is 1 or more than 2, release a block.
+            # If lead is more than 2, release a block. Will move to state k-1, where k is lead.
             elif ( len(event.node.block_queue) and
-                   event.node.block_queue[0].block_position <= block.block_position):
+                   event.node.block_queue[0].block_position == block.block_position):
                 attacker_block = event.node.block_queue.pop(0)
                 self.propogateBlock(event,attacker_block,event.node.id)
 
+            # If there are any cached block with received block as block id, verify and add them in blockchain
             if block.id in event.node.blockchain.cached_blocks:
                 block = event.node.blockchain.cached_blocks[block.id]
             else:
                 break
 
-        if flag:
-            new_block = event.node.create_block()
-            self.add_event(Event(
-                    event_time=round(event.time+self.gen_exp.exponential(self.iat_b/event.node.hash),4),
-                    event_type=4,
-                    event_node=event.node,
-                    block=new_block
-                ))
+        return flag
             
     def receiveBlockStubborn(self,event:Event):
         block = event.extra_parameters['block']
@@ -222,19 +237,13 @@ class EventHandler:
                 attacker_block = event.node.block_queue.pop(0)
                 self.propogateBlock(event,attacker_block,event.node.id)
 
+            # If there are any cached block with received block as block id, verify and add them in blockchain
             if block.id in event.node.blockchain.cached_blocks:
                 block = event.node.blockchain.cached_blocks[block.id]
             else:
                 break
 
-        if flag:
-            new_block = event.node.create_block()
-            self.add_event(Event(
-                    event_time=round(event.time+self.gen_exp.exponential(self.iat_b/event.node.hash),4),
-                    event_type=4,
-                    event_node=event.node,
-                    block=new_block
-                ))
+        return flag
 
     def propogateBlock(self,event:Event, block:Block,event_creator_node:int):
         for peer_id in event.node.peers:

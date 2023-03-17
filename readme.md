@@ -20,7 +20,11 @@ Discrete event simulator for a P2P cryptocurrency network (Similar to etherum). 
 
 - Run the simulator 
 
+    To run simulator in normal mode:
     ```python3 main.py <num_nodes> <slow_nodes> <low_hash> <inter-arrival_time_txn> <inter-arrival_time_block> <simulation_time> <max_block_length>```
+    To run simulator in attack mode:
+    ```python3 main.py <num_nodes> <slow_nodes> <low_hash> <inter-arrival_time_txn> <inter-arrival_time_block> <simulation_time> <max_block_length> <attack_type> <adv_hash> <adv_connected>```
+    attack_type: 1 for Selfish Mining attack, 2 for Stubborn attack.
 
 # **Results**
 Results can be found in the results directory after the simulation has completed. 
